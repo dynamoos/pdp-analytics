@@ -1,0 +1,56 @@
+[project]
+name = "pdp-analytics"
+version = "0.1.0"
+description = "Sistema de análisis de PDPs con integración API y generación de reportes"
+authors = [{ name = "Anthonny Gómez Santivañez", email = "agomez@dynamoos.pe" }]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn[standard]==0.34.3",
+    "pydantic==2.11.5",
+    "setuptools>=80.9.0",
+    "google-cloud-bigquery==3.34.0",
+    "pandas==2.3.0",
+    'pandas-gbq==0.29.0',
+    "python-dotenv==1.1.0",
+    "loguru==0.7.3",
+]
+
+[dependency-groups]
+dev = [
+    'black>=25.1.0',
+    'mypy>=1.15.0',
+    'ruff>=0.11.10',
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pre-commit==4.2.0"
+]
+
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+ignore = []
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --cov=src"
+testpaths = ["tests"]
+pythonpath = ["."]
