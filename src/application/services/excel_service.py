@@ -1,12 +1,14 @@
-from typing import List, Dict, Any
 from datetime import datetime
-import pandas as pd
 from pathlib import Path
+from typing import Any, Dict, List
 
-from src.domain.entities.pdp_record import PDPRecord
-from src.application.dto.excel_dto import ExcelGenerationDTO, SheetConfig, HeatmapConfig
-from src.shared.constants import ExcelHeaders, EXCEL_OUTPUT_PATH
 from loguru import logger
+
+from src.application.dto.excel_dto import ExcelGenerationDTO, HeatmapConfig, SheetConfig
+from src.domain.entities.pdp_record import PDPRecord
+from src.infrastructure.excel.excel_generator import ExcelGenerator
+from src.infrastructure.excel.heatmap_formatter import HeatmapFormatter
+from src.shared.constants import EXCEL_OUTPUT_PATH, ExcelHeaders
 
 
 class ExcelService:
@@ -15,6 +17,8 @@ class ExcelService:
     def __init__(self, output_path: str = EXCEL_OUTPUT_PATH):
         self._output_path = Path(output_path)
         self._output_path.mkdir(exist_ok=True)
+        self._excel_generator = ExcelGenerator()
+        self._heatmap_formatter = HeatmapFormatter()
 
     async def generate_pdp_report(
         self, pdp_records: List[PDPRecord], include_heatmap: bool = True
@@ -57,9 +61,8 @@ class ExcelService:
         logger.info(f"Excel report generated: {filepath}")
         return str(filepath)
 
-    def _convert_records_to_dict(
-        self, pdp_records: List[PDPRecord]
-    ) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _convert_records_to_dict(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
         """Convert PDP records to dictionary format for Excel"""
         return [
             {
@@ -89,35 +92,33 @@ class ExcelService:
         self, pdp_records: List[PDPRecord]
     ) -> List[Dict[str, Any]]:
         """Prepare data for heatmap visualization"""
-        df = pd.DataFrame(
-            [
+        # Group records by month
+        records_by_month = {}
+        for record in pdp_records:
+            month_key = (record.period.year, record.period.month)
+            if month_key not in records_by_month:
+                records_by_month[month_key] = []
+            records_by_month[month_key].append(
                 {
                     "dni": record.dni,
-                    "name": record.agent_full_name,
+                    "agent_name": record.agent_full_name,
                     "day": record.record_date.day,
                     "pdp_per_hour": (
                         float(record.pdp_per_hour) if record.pdp_per_hour else 0
                     ),
                 }
-                for record in pdp_records
-            ]
-        )
+            )
 
-        # Pivot to create matrix
-        pivot = df.pivot_table(
-            values="pdp_per_hour", index=["dni", "name"], columns="day", fill_value=0
-        )
+        # For now, use the first month (or implement month selection)
+        if records_by_month:
+            (year, month), month_records = list(records_by_month.items())[0]
+            heatmap_df = self._heatmap_formatter.format_productivity_heatmap(
+                month_records, month, year
+            )
+            return heatmap_df.to_dict("records")
 
-        heatmap_data = []
-        for (dni, name), row in pivot.iterrows():
-            row_data = {"DNI": dni, "Nombre": name, "Supervisor": "N/A"}
-            for day in range(1, 32):
-                row_data[str(day)] = row.get(day, 0)
-            heatmap_data.append(row_data)
-
-        return heatmap_data
+        return []
 
     def _generate_excel_file(self, excel_dto: ExcelGenerationDTO):
-        """Placeholder for Excel generation - will be implemented in infrastructure"""
-        # This will be replaced by the actual Excel generator in infrastructure
-        pass
+        """Generate Excel file using infrastructure component"""
+        self._excel_generator.generate(excel_dto)
