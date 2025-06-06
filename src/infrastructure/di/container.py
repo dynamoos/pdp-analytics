@@ -1,6 +1,5 @@
 from dependency_injector import containers, providers
 
-from src.infrastructure.config.settings import AppSettings
 from src.infrastructure.di.modules import (
     DatabaseModule,
     RepositoryModule,
@@ -16,13 +15,13 @@ class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
 
     # Load settings
-    settings = providers.Singleton(AppSettings)
+    settings = providers.Configuration()
 
     database = providers.Container(DatabaseModule, config=config)
 
     repositories = providers.Container(RepositoryModule, database=database)
 
-    services = providers.Container(ServiceModule, settings=settings)
+    services = providers.Container(ServiceModule, config=config)
 
     use_cases = providers.Container(
         UseCaseModule, repositories=repositories, services=services

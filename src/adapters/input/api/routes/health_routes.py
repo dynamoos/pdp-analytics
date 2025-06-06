@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends
@@ -16,7 +16,7 @@ async def health_check():
     """Basic health check endpoint"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "Telefonica PDP Analytics API",
     }
 

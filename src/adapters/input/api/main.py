@@ -25,6 +25,9 @@ async def lifespan(app: FastAPI):
     container = Container()
 
     # Load configuration
+    container.settings.excel.output_path.from_value(settings.excel.output_path)
+    container.settings.excel.template_path.from_value(settings.excel.template_path)
+
     container.config.google.auth_email.from_value(settings.google.auth_email)
     container.config.google.auth_password.from_value(settings.google.auth_password)
     container.config.google.api_key.from_value(settings.google.api_key)
@@ -40,8 +43,8 @@ async def lifespan(app: FastAPI):
     container.config.api.timeout.from_value(settings.api.timeout)
     container.config.api.max_retries.from_value(settings.api.max_retries)
 
-    container.config.from_yaml("config/config.yaml")
-    container.config.from_env("APP", as_=dict)
+    # container.config.from_yaml("config/config.yaml")
+    # container.config.from_env("APP", as_=dict)
 
     # Wire the container
     container.wire(
@@ -67,7 +70,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.name,
-        description="API for processing PDP data with call and Excel generation",
+        description="Telefonica PDP Analytics",
         version="1.0.0",
         debug=settings.debug,
         lifespan=lifespan,

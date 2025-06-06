@@ -90,6 +90,9 @@ async def download_excel(filename: str):
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error downloading file: {str(e)}")
         raise HTTPException(status_code=500, detail="Error downloading file")
