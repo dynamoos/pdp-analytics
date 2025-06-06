@@ -72,3 +72,5 @@ output/
 # Windows
 Thumbs.db
 desktop.ini
+
+credentials/
