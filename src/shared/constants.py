@@ -1,5 +1,6 @@
 """Domain constants"""
 
+import os
 from enum import Enum
 
 
@@ -47,6 +48,7 @@ API_MAX_RETRIES = 3
 API_RETRY_DELAY = 1
 
 # Excel Configuration
+EXCEL_OUTPUT_PATH = os.getenv("EXCEL_OUTPUT_PATH", "./output")
 EXCEL_MAX_ROWS = 1048576
 EXCEL_MAX_COLUMNS = 16384
 HEATMAP_COLOR_SCALE = {"min": "#63BE7B", "mid": "#FFEB84", "max": "#F8696B"}

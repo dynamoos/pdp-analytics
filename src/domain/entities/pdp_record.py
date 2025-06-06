@@ -11,32 +11,35 @@ from src.domain.value_objects.period import Period
 class PDPRecord:
     """Entity representing a PDP (Payment Promise) record"""
 
+    # Agent identification
     dni: str
-    luna_code: str
-    account: str
-
     agent_full_name: str
     agent_email: Email
 
+    # Temporal information
     record_date: date
     period: Period
     month_name: str
 
+    # Classification
     service_type: str
     portfolio: str
     due_day: int
 
+    # Metrics from BigQuery
     pdp_count: int
     total_pdp_operations: int
-    total_managed_amount: float
+    total_managed_amount: Decimal
     days_with_pdp: int
     documents_with_debt: int
-    average_amount_per_document: float
+    average_amount_per_document: Decimal
 
+    # From API calls (optional)
     total_connected_seconds: Optional[int] = None
     total_time_hms: Optional[str] = None
 
-    pdp_per_hour: Optional[float] = None
+    # Calculated metric for heatmap
+    pdp_per_hour: Optional[Decimal] = None
 
     def __post_init__(self):
         """Entity validations"""
@@ -49,7 +52,7 @@ class PDPRecord:
         if self.due_day < 1 or self.due_day > 31:
             raise ValueError("Due day must be between 1 and 31")
 
-        if self.service_type not in ["MOBILE", "FIXED"]:
+        if self.service_type not in ["MOVIL", "FIJA"]:
             raise ValueError(f"Invalid service type: {self.service_type}")
 
     @property
@@ -65,3 +68,10 @@ class PDPRecord:
         if self.total_pdp_operations == 0:
             return 0.0
         return self.documents_with_debt / self.total_pdp_operations
+
+    @property
+    def connected_hours(self) -> Optional[float]:
+        """Convert seconds to hours if available"""
+        if self.total_connected_seconds is None:
+            return None
+        return self.total_connected_seconds / 3600
