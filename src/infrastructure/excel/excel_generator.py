@@ -83,8 +83,12 @@ class ExcelGenerator:
         # Find numeric columns (days 1-31)
         numeric_columns = []
         for col in df.columns:
-            if col.isdigit() and 1 <= int(col) <= 31:
-                numeric_columns.append(col)
+            if isinstance(col, int):
+                if 1 <= col <= 31:
+                    numeric_columns.append(col)
+            elif isinstance(col, str) and col.isdigit():
+                if 1 <= int(col) <= 31:
+                    numeric_columns.append(col)
 
         # Apply conditional formatting to each numeric column
         for col in numeric_columns:

@@ -85,8 +85,14 @@ class ProcessPDPDataUseCase:
         """Enrich PDP records with call data from external API"""
         logger.info("Enriching PDP records with call data")
 
+        unique_dates = list(set(record.record_date for record in pdp_records))
+        unique_dates.sort()  # Ordenar las fechas
+
+        logger.info(f"Fechas únicas: {unique_dates}")
+
         # Group records by date for batch processing
         records_by_date: Dict[date, List[PDPRecord]] = {}
+
         for record in pdp_records:
             if record.record_date not in records_by_date:
                 records_by_date[record.record_date] = []
@@ -125,6 +131,11 @@ class ProcessPDPDataUseCase:
                         )
 
                         if call_data:
+                            logger.debug(
+                                f"Call data for {record.agent_email.value}: "
+                                f"seconds={call_data.total_connected_seconds}, "
+                                f"time={call_data.total_time_hms}"
+                            )
                             # Create new record with call data
                             enriched_record = PDPRecord(
                                 **{
@@ -163,8 +174,13 @@ class ProcessPDPDataUseCase:
             if record.total_connected_seconds and record.total_connected_seconds > 0:
                 hours_connected = record.total_connected_seconds / 3600
                 pdp_per_hour = Decimal(str(record.pdp_count / hours_connected))
+                logger.debug(
+                    f"Agent {record.dni}: {record.pdp_count} PDPs / "
+                    f"{hours_connected:.2f} hours = {pdp_per_hour:.2f} PDPs/hour"
+                )
             else:
                 pdp_per_hour = Decimal("0")
+                logger.debug(f"Agent {record.dni}: No connected time, PDPs/hour = 0")
 
             # Create new record with calculated metric
             calculated_record = PDPRecord(

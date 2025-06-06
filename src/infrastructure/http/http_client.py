@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, Optional
 
 import httpx
@@ -64,7 +65,9 @@ class HttpClient:
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
-        async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout)) as client:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(self._timeout), verify=ssl_context
+        ) as client:
             try:
                 # Build headers
                 request_headers = await self._get_headers()
@@ -80,21 +83,49 @@ class HttpClient:
                 logger.debug(f"GET request to: {url} with params: {params}")
 
                 response = await client.get(url, params=params, headers=request_headers)
-
                 response.raise_for_status()
 
-                data = response.json()
-                logger.debug(f"Response received: {response.status_code}")
+                response_text = response.text
 
+                if response_text.startswith("<br"):
+                    json_start = response_text.find("{")
+                    if json_start != -1:
+                        response_text = response_text[json_start:]
+                        logger.warning("Cleaned PHP error from response")
+
+                try:
+                    data = json.loads(response_text)
+                except json.JSONDecodeError as e:
+                    logger.error(
+                        f"Failed to parse JSON. Response: {response_text[:200]}"
+                    )
+                    raise ExternalApiException(
+                        f"Invalid JSON response: {str(e)}"
+                    ) from e
+
+                logger.debug(f"Response received: {response.status_code}")
                 return data
 
+            except httpx.ReadTimeout as e:
+                logger.error(
+                    f"Read timeout after {self._timeout}s waiting for response from {url}"
+                )
+                raise ExternalApiException(
+                    "API response timeout - the server took too long to respond"
+                ) from e
+            except httpx.ConnectTimeout as e:
+                logger.error(f"Connection timeout after 10s trying to connect to {url}")
+                raise ExternalApiException("Could not connect to API server") from e
+            except httpx.TimeoutException as e:
+                logger.error(f"General timeout: {type(e).__name__}: {str(e)}")
+                raise ExternalApiException(f"Request timed out: {str(e)}") from e
             except httpx.HTTPStatusError as e:
                 logger.error(f"HTTP error {e.response.status_code}: {e.response.text}")
                 raise ExternalApiException(
                     f"API request failed with status {e.response.status_code}"
                 ) from e
             except httpx.RequestError as e:
-                logger.error(f"Request error: {str(e)}")
+                logger.error(f"Request error: {type(e).__name__}: {str(e)}")
                 raise ExternalApiException(f"Failed to connect to API: {str(e)}") from e
             except Exception as e:
                 logger.error(f"Unexpected error: {str(e)}")

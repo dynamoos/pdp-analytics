@@ -41,7 +41,9 @@ class ExcelService:
         ]
 
         if include_heatmap:
+            logger.info("Generating heatmap data...")
             heatmap_data = self._prepare_heatmap_data(pdp_records)
+            logger.info(f"Heatmap data prepared: {len(heatmap_data)} rows")
             sheet_configs.append(
                 SheetConfig(
                     sheet_name="Mapa_Calor",
@@ -51,6 +53,8 @@ class ExcelService:
                     heatmap_config=HeatmapConfig(value_column="pdp_per_hour"),
                 )
             )
+        else:
+            logger.warning("No heatmap data to generate")
 
         excel_dto = ExcelGenerationDTO(
             output_filename=str(filepath), sheet_configs=sheet_configs
@@ -93,11 +97,16 @@ class ExcelService:
     ) -> List[Dict[str, Any]]:
         """Prepare data for heatmap visualization"""
         # Group records by month
+        logger.info(f"Preparing heatmap for {len(pdp_records)} records")
         records_by_month = {}
         for record in pdp_records:
             month_key = (record.period.year, record.period.month)
             if month_key not in records_by_month:
                 records_by_month[month_key] = []
+            logger.debug(
+                f"Record: {record.dni} - Day: {record.record_date.day} - "
+                f"PDPs/hour: {record.pdp_per_hour}"
+            )
             records_by_month[month_key].append(
                 {
                     "dni": record.dni,
@@ -108,7 +117,6 @@ class ExcelService:
                     ),
                 }
             )
-
         # For now, use the first month (or implement month selection)
         if records_by_month:
             (year, month), month_records = list(records_by_month.items())[0]
@@ -116,6 +124,7 @@ class ExcelService:
                 month_records, month, year
             )
             return heatmap_df.to_dict("records")
+        logger.info(f"Records grouped by month: {list(records_by_month.keys())}")
 
         return []
 
