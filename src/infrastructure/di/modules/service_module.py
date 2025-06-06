@@ -9,7 +9,5 @@ class ServiceModule(containers.DeclarativeContainer):
 
     config = providers.Configuration()
 
-    # Excel Service con valor por defecto
-    excel_service = providers.Singleton(
-        ExcelService, output_path=config.excel_output_path.provided(EXCEL_OUTPUT_PATH)
-    )
+    # Excel Service - usar el valor directamente
+    excel_service = providers.Singleton(ExcelService, output_path=EXCEL_OUTPUT_PATH)

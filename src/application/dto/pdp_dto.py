@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional, List
 from decimal import Decimal
+from typing import List
 
 
 @dataclass
@@ -10,8 +10,6 @@ class PDPRequestDTO:
 
     start_date: date
     end_date: date
-    service_type: Optional[str] = None
-    portfolio: Optional[str] = None
     include_call_data: bool = True
     generate_heatmap: bool = True
 

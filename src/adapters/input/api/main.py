@@ -5,8 +5,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from src.adapters.input.api.exception_handlers import setup_exception_handlers
-from src.adapters.input.api.middlewares.error_handler import error_handler_middleware
 from src.adapters.input.api.routes import health_routes, pdp_routes
 from src.infrastructure.config.settings import settings
 from src.infrastructure.di.container import Container
@@ -86,10 +84,10 @@ def create_app() -> FastAPI:
     )
 
     # Add custom middleware
-    app.middleware("http")(error_handler_middleware)
+    # app.middleware("http")(error_handler_middleware)
 
     # Setup exception handlers
-    setup_exception_handlers(app)
+    # setup_exception_handlers(app)
 
     # Include routers
     app.include_router(health_routes.router, tags=["Health"])

@@ -40,7 +40,11 @@ class HttpClient:
         if self._mibot_session:
             import json
 
-            headers["mibot_session"] = json.dumps(self._mibot_session)
+            session_data = {
+                "project_uid": str(self._mibot_session.get("project_uid", "")),
+                "client_uid": str(self._mibot_session.get("client_uid", "")),
+            }
+            headers["mibot_session"] = json.dumps(session_data)
 
         return headers
 
@@ -55,6 +59,11 @@ class HttpClient:
         headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """Execute GET request with retry logic"""
+        import ssl
+
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
         async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout)) as client:
             try:
                 # Build headers

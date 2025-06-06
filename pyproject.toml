@@ -21,6 +21,7 @@ dependencies = [
     "pytest>=8.4.0",
     "pytest-cov>=6.1.1",
     "pydantic-settings>=2.9.1",
+    "xlsxwriter>=3.2.3",
 ]
 
 [dependency-groups]

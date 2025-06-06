@@ -23,7 +23,7 @@ class DatabaseModule(containers.DeclarativeContainer):
         BigQueryClient,
         project_id=config.google.project_id,
         credentials_path=config.google.credentials_path,
-        location="US",
+        location="us-east1",
     )
 
     # HTTP Client for external API
@@ -31,10 +31,12 @@ class DatabaseModule(containers.DeclarativeContainer):
         HttpClient,
         base_url=config.mibot.api_base_url,
         auth_client=auth_client,
-        mibot_session={
-            "project_uid": config.mibot.project_uid,
-            "client_uid": config.mibot.client_uid,
-        },
+        mibot_session=providers.Dict(
+            {
+                "project_uid": config.mibot.project_uid,
+                "client_uid": config.mibot.client_uid,
+            }
+        ),
         timeout=config.api.timeout,
         max_retries=config.api.max_retries,
     )

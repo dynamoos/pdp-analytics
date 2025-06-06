@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 from decimal import Decimal
+from typing import Optional
 
 from src.domain.value_objects.email import Email
 from src.domain.value_objects.period import Period
@@ -49,10 +49,10 @@ class PDPRecord:
         if self.total_managed_amount < 0:
             raise ValueError("Total managed amount cannot be negative")
 
-        if self.due_day < 1 or self.due_day > 31:
-            raise ValueError("Due day must be between 1 and 31")
+        if self.due_day < 0 or self.due_day > 31:
+            raise ValueError("Due day must be between 0 and 31")
 
-        if self.service_type not in ["MOVIL", "FIJA"]:
+        if self.service_type not in ["MOVIL", "FIJA", "Sin Servicio"]:
             raise ValueError(f"Invalid service type: {self.service_type}")
 
     @property

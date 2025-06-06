@@ -1,6 +1,5 @@
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -20,8 +19,6 @@ router = APIRouter(prefix="/pdp")
 async def process_pdp_data(
     start_date: date,
     end_date: date,
-    service_type: Optional[str] = None,
-    portfolio: Optional[str] = None,
     include_call_data: bool = True,
     generate_heatmap: bool = True,
     use_case: ProcessPDPDataUseCase = Depends(
@@ -51,8 +48,6 @@ async def process_pdp_data(
         request = PDPRequestDTO(
             start_date=start_date,
             end_date=end_date,
-            service_type=service_type,
-            portfolio=portfolio,
             include_call_data=include_call_data,
             generate_heatmap=generate_heatmap,
         )

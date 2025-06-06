@@ -1,15 +1,16 @@
-from typing import List, Dict
+import time
 from datetime import date
 from decimal import Decimal
-import time
+from typing import Dict, List
 
-from src.domain.repositories.pdp_repository import PDPRepository
-from src.domain.repositories.call_api_repository import CallApiRepository
-from src.domain.entities.pdp_record import PDPRecord
+from loguru import logger
+
 from src.application.dto.pdp_dto import PDPRequestDTO, PDPResponseDTO
 from src.application.services.excel_service import ExcelService
+from src.domain.entities.pdp_record import PDPRecord
+from src.domain.repositories.call_api_repository import CallApiRepository
+from src.domain.repositories.pdp_repository import PDPRepository
 from src.shared.exceptions import UseCaseException
-from loguru import logger
 
 
 class ProcessPDPDataUseCase:
@@ -38,8 +39,6 @@ class ProcessPDPDataUseCase:
             pdp_records = await self._pdp_repository.get_by_date_range(
                 start_date=request.start_date,
                 end_date=request.end_date,
-                service_type=request.service_type,
-                portfolio=request.portfolio,
             )
 
             if not pdp_records:

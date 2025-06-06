@@ -15,12 +15,13 @@ class BigQueryClient:
         self,
         project_id: str,
         credentials_path: Optional[str] = None,
-        location: str = "US",
+        location: str = "us-east1",
     ):
         self._project_id = project_id
         self._location = location
 
         try:
+            logger.debug(f"Credentials path received: {credentials_path}")
             if credentials_path and os.path.exists(credentials_path):
                 credentials = service_account.Credentials.from_service_account_file(
                     credentials_path
