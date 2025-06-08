@@ -1,16 +1,14 @@
 import time
-from datetime import date
 from decimal import Decimal
-from typing import Dict, List
+from typing import List
 
 from loguru import logger
 
 from src.application.dto.pdp_dto import PDPRequestDTO, PDPResponseDTO
-from src.application.services.excel_service import ExcelService
+from src.domain.entities.call_data import AgentCallData
 from src.domain.entities.pdp_record import PDPRecord
-from src.domain.repositories.call_api_repository import CallApiRepository
+from src.domain.repositories.call_repository import CallRepository
 from src.domain.repositories.pdp_repository import PDPRepository
-from src.shared.exceptions import UseCaseException
 
 
 class ProcessPDPDataUseCase:
@@ -19,12 +17,12 @@ class ProcessPDPDataUseCase:
     def __init__(
         self,
         pdp_repository: PDPRepository,
-        call_api_repository: CallApiRepository,
-        excel_service: ExcelService,
+        call_repository: CallRepository,
+        # excel_service: ExcelService,
     ):
         self._pdp_repository = pdp_repository
-        self._call_api_repository = call_api_repository
-        self._excel_service = excel_service
+        self._call_repository = call_repository
+        # self._excel_service = excel_service
 
     async def execute(self, request: PDPRequestDTO) -> PDPResponseDTO:
         """Execute the use case"""
@@ -32,165 +30,161 @@ class ProcessPDPDataUseCase:
         errors = []
 
         try:
-            # Step 1: Get PDP records from BigQuery
-            logger.info(
-                f"Fetching PDP records from {request.start_date} to {request.end_date}"
+            call_data = await self._call_repository.get_by_date_range(
+                request.start_date, request.end_date
             )
-            pdp_records = await self._pdp_repository.get_by_date_range(
-                start_date=request.start_date,
-                end_date=request.end_date,
+            if not call_data:
+                logger.warning("No call data found")
+                processing_time = time.time() - start_time
+                return PDPResponseDTO.empty(
+                    processing_time=processing_time,
+                    errors=["No call data found for the specified period"],
+                )
+
+            available_dates = set(record.call_date for record in call_data)
+            available_emails = set(record.agent_email.value for record in call_data)
+
+            logger.info(
+                f"Found {len(available_dates)} dates and "
+                f"{len(available_emails)} unique agents with call data"
             )
 
-            if not pdp_records:
-                raise UseCaseException(
-                    "No PDP records found for the specified criteria"
-                )
+            pdp_records = await self._pdp_repository.get_by_filters(
+                dates=list(available_dates), agent_emails=list(available_emails)
+            )
 
             logger.info(f"Found {len(pdp_records)} PDP records")
 
-            # Step 2: Enrich with call data if requested
-            if request.include_call_data:
-                pdp_records = await self._enrich_with_call_data(pdp_records, errors)
+            enriched_records = await self._enrich_with_call_data(pdp_records, call_data)
 
-            # Step 3: Calculate productivity metrics
-            pdp_records = self._calculate_productivity_metrics(pdp_records)
+            csv_path = await self._save_to_csv(enriched_records)
 
-            # Step 4: Generate Excel report
-            excel_path = await self._excel_service.generate_pdp_report(
-                pdp_records=pdp_records, include_heatmap=request.generate_heatmap
+            total_pdps = sum(record.pdp_count for record in enriched_records)
+            total_amount = sum(
+                record.total_managed_amount for record in enriched_records
             )
-
-            # Step 5: Calculate summary metrics
-            total_pdps = sum(record.pdp_count for record in pdp_records)
-            total_amount = sum(record.total_managed_amount for record in pdp_records)
-
             processing_time = time.time() - start_time
 
             return PDPResponseDTO(
-                total_records=len(pdp_records),
+                total_records=len(enriched_records),
                 total_pdps=total_pdps,
-                total_amount=total_amount,
-                excel_file_path=excel_path,
+                total_amount=Decimal(total_amount),
+                excel_file_path=csv_path,
                 processing_time_seconds=processing_time,
                 errors=errors if errors else None,
             )
 
         except Exception as e:
             logger.error(f"Error processing PDP data: {str(e)}")
-            raise UseCaseException(f"Failed to process PDP data: {str(e)}")
 
+            processing_time = time.time() - start_time
+
+            return PDPResponseDTO.with_error(
+                error_message=f"Failed to process PDP data: {str(e)}",
+                processing_time=processing_time,
+            )
+
+    @staticmethod
     async def _enrich_with_call_data(
-        self, pdp_records: List[PDPRecord], errors: List[str]
+        pdp_records: List[PDPRecord], call_data: List[AgentCallData]
     ) -> List[PDPRecord]:
-        """Enrich PDP records with call data from external API"""
-        logger.info("Enriching PDP records with call data")
+        call_lookup = {
+            (call.agent_email.value.lower(), call.call_date): call for call in call_data
+        }
 
-        unique_dates = list(set(record.record_date for record in pdp_records))
-        unique_dates.sort()  # Ordenar las fechas
+        from collections import defaultdict
 
-        logger.info(f"Fechas únicas: {unique_dates}")
-
-        # Group records by date for batch processing
-        records_by_date: Dict[date, List[PDPRecord]] = {}
-
-        for record in pdp_records:
-            if record.record_date not in records_by_date:
-                records_by_date[record.record_date] = []
-            records_by_date[record.record_date].append(record)
+        pdp_groups = defaultdict(list)
+        for pdp in pdp_records:
+            pdp_groups[(pdp.agent_email.value.lower(), pdp.record_date)].append(pdp)
 
         enriched_records = []
 
-        # Process each date
-        for query_date, date_records in records_by_date.items():
-            # Prepare batch request
-            agents_data = [
-                {"email": record.agent_email, "dni": record.dni}
-                for record in date_records
-            ]
+        for (email, date), pdp_list in pdp_groups.items():
+            call = call_lookup.get((email, date))
 
-            # Get call data for all agents on this date
-            try:
-                call_responses = (
-                    await self._call_api_repository.get_multiple_agents_calls(
-                        agents_data=agents_data, query_date=query_date
-                    )
-                )
+            if call:
+                total_seconds = call.total_connected_seconds
+                total_pdps = sum(p.pdp_count for p in pdp_list)
 
-                # Match call data with PDP records
-                for record in date_records:
-                    api_email = record.agent_email.api_format
+                for pdp in pdp_list:
+                    weight = pdp.pdp_count / total_pdps if total_pdps > 0 else 0
+                    weighted_seconds = int(total_seconds * weight)
+                    enriched_records.append(pdp.with_connected_time(weighted_seconds))
+            else:
+                enriched_records.extend(pdp_list)
 
-                    if (
-                        api_email in call_responses
-                        and call_responses[api_email].success
-                    ):
-                        call_data = (
-                            call_responses[api_email].data[0]
-                            if call_responses[api_email].data
-                            else None
-                        )
-
-                        if call_data:
-                            logger.debug(
-                                f"Call data for {record.agent_email.value}: "
-                                f"seconds={call_data.total_connected_seconds}, "
-                                f"time={call_data.total_time_hms}"
-                            )
-                            # Create new record with call data
-                            enriched_record = PDPRecord(
-                                **{
-                                    field: getattr(record, field)
-                                    for field in record.__dataclass_fields__
-                                    if field
-                                    not in ["total_connected_seconds", "total_time_hms"]
-                                },
-                                total_connected_seconds=call_data.total_connected_seconds,
-                                total_time_hms=call_data.total_time_hms,
-                            )
-                            enriched_records.append(enriched_record)
-                        else:
-                            enriched_records.append(record)
-                    else:
-                        errors.append(
-                            f"Failed to get call data for {record.agent_email.value} on {query_date}"
-                        )
-                        enriched_records.append(record)
-
-            except Exception as e:
-                logger.error(f"Error fetching call data for {query_date}: {str(e)}")
-                errors.append(f"API error for date {query_date}: {str(e)}")
-                enriched_records.extend(date_records)
-
-        logger.info(f"Enriched {len(enriched_records)} records with call data")
         return enriched_records
 
-    def _calculate_productivity_metrics(
-        self, pdp_records: List[PDPRecord]
-    ) -> List[PDPRecord]:
-        """Calculate productivity metrics (PDPs per hour)"""
-        calculated_records = []
+    @staticmethod
+    async def _save_to_csv(records: List[PDPRecord]) -> str:
+        """Save enriched PDP records to CSV for testing"""
+        import csv
+        from datetime import datetime
+        from pathlib import Path
 
-        for record in pdp_records:
-            if record.total_connected_seconds and record.total_connected_seconds > 0:
-                hours_connected = record.total_connected_seconds / 3600
-                pdp_per_hour = Decimal(str(record.pdp_count / hours_connected))
-                logger.debug(
-                    f"Agent {record.dni}: {record.pdp_count} PDPs / "
-                    f"{hours_connected:.2f} hours = {pdp_per_hour:.2f} PDPs/hour"
+        output_dir = Path("output/csv")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = output_dir / f"enriched_pdp_data_{timestamp}.csv"
+
+        with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+            fieldnames = [
+                "fecha",
+                "dni",
+                "nombre_agente",
+                "email",
+                "servicio",
+                "cartera",
+                "vencimiento",
+                "periodo",
+                "mes",
+                "pdp_count",
+                "total_operaciones",
+                "monto_gestionado",
+                "dias_con_pdp",
+                "documentos_con_deuda",
+                "monto_promedio",
+                "segundos_conectado",
+                "tiempo_conectado_hms",
+                "pdp_por_hora",
+            ]
+
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for record in records:
+                writer.writerow(
+                    {
+                        "fecha": record.record_date.isoformat(),
+                        "dni": record.dni,
+                        "nombre_agente": record.agent_full_name,
+                        "email": record.agent_email.value,
+                        "servicio": record.service_type,
+                        "cartera": record.portfolio,
+                        "vencimiento": record.due_day,
+                        "periodo": f"{record.period.year}-{record.period.month:02d}",
+                        "mes": record.month_name,
+                        "pdp_count": record.pdp_count,
+                        "total_operaciones": record.total_pdp_operations,
+                        "monto_gestionado": float(record.total_managed_amount),
+                        "dias_con_pdp": record.days_with_pdp,
+                        "documentos_con_deuda": record.documents_with_debt,
+                        "monto_promedio": float(record.average_amount_per_document),
+                        "segundos_conectado": record.total_connected_seconds or 0,
+                        "tiempo_conectado_hms": (
+                            record.connected_hours
+                            if record.total_connected_seconds
+                            else ""
+                        ),
+                        "pdp_por_hora": (
+                            float(record.pdp_per_hour)
+                            if record.total_connected_seconds
+                            else 0
+                        ),
+                    }
                 )
-            else:
-                pdp_per_hour = Decimal("0")
-                logger.debug(f"Agent {record.dni}: No connected time, PDPs/hour = 0")
 
-            # Create new record with calculated metric
-            calculated_record = PDPRecord(
-                **{
-                    field: getattr(record, field)
-                    for field in record.__dataclass_fields__
-                    if field != "pdp_per_hour"
-                },
-                pdp_per_hour=pdp_per_hour,
-            )
-            calculated_records.append(calculated_record)
-
-        return calculated_records
+        logger.info(f"✅ Saved {len(records)} records to {filename}")
+        return str(filename)

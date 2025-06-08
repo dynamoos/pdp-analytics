@@ -1,7 +1,8 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from google.cloud import bigquery
+from google.cloud.bigquery import ArrayQueryParameter, ScalarQueryParameter
 from google.oauth2 import service_account
 from loguru import logger
 
@@ -15,7 +16,7 @@ class BigQueryClient:
         self,
         project_id: str,
         credentials_path: Optional[str] = None,
-        location: str = "us-east1",
+        location: str = None,
     ):
         self._project_id = project_id
         self._location = location
@@ -29,24 +30,20 @@ class BigQueryClient:
                 self._client = bigquery.Client(
                     project=project_id, credentials=credentials, location=location
                 )
-            else:
-                # Use default credentials (from environment)
-                self._client = bigquery.Client(project=project_id, location=location)
-
-            logger.info(f"BigQuery client initialized for project: {project_id}")
-
+                logger.info(f"BigQuery client initialized for project: {project_id}")
         except Exception as e:
             logger.error(f"Failed to initialize BigQuery client: {str(e)}")
-            raise DatabaseException(f"BigQuery initialization failed: {str(e)}")
+            raise DatabaseException(f"BigQuery initialization failed: {str(e)}") from e
 
     async def execute_query(
         self,
         query: str,
-        parameters: Optional[List[bigquery.ScalarQueryParameter]] = None,
+        parameters: Optional[
+            List[Union[ScalarQueryParameter, ArrayQueryParameter]]
+        ] = None,
     ) -> List[Dict[str, Any]]:
-        """Execute a query and return results as list of dictionaries"""
         try:
-            logger.debug(f"Executing query: {query[:100]}...")
+            logger.debug(f"Executing query: {query[:50]}...")
 
             job_config = bigquery.QueryJobConfig()
             if parameters:
@@ -55,7 +52,6 @@ class BigQueryClient:
             query_job = self._client.query(query, job_config=job_config)
             results = query_job.result()
 
-            # Convert results to list of dictionaries
             rows = []
             for row in results:
                 rows.append(dict(row))
@@ -65,8 +61,7 @@ class BigQueryClient:
 
         except Exception as e:
             logger.error(f"Query execution failed: {str(e)}")
-            raise DatabaseException(f"BigQuery query failed: {str(e)}")
+            raise DatabaseException(f"BigQuery query failed: {str(e)}") from e
 
     def get_client(self) -> bigquery.Client:
-        """Get the underlying BigQuery client"""
         return self._client

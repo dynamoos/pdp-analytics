@@ -24,15 +24,6 @@ class Period:
         """Create Period from date object"""
         return cls(year=date_obj.year, month=date_obj.month)
 
-    @classmethod
-    def from_string(cls, period_str: str) -> "Period":
-        """Create Period from string format YYYY-MM"""
-        try:
-            year, month = period_str.split("-")
-            return cls(year=int(year), month=int(month))
-        except (ValueError, AttributeError):
-            raise ValueError(f"Invalid period format: {period_str}")
-
     @property
     def formatted(self) -> str:
         """Return formatted period as YYYY-MM"""

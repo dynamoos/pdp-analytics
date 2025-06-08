@@ -5,14 +5,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from src.adapters.input.api.routes import health_routes, pdp_routes
+from src.adapters.input_adapters.api.routes import health_routes, pdp_routes
 from src.infrastructure.config.settings import settings
 from src.infrastructure.di.container import Container
 from src.infrastructure.logging.logger import setup_logging
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(fastapi: FastAPI):
     """Handle application startup and shutdown"""
     # Startup
     logger.info(f"Starting {settings.name} in {settings.env} mode")
@@ -22,37 +22,17 @@ async def lifespan(app: FastAPI):
     # Initialize DI container
     container = Container()
 
-    # Load configuration
-    container.settings.excel.output_path.from_value(settings.excel.output_path)
-    container.settings.excel.template_path.from_value(settings.excel.template_path)
-
-    container.config.google.auth_email.from_value(settings.google.auth_email)
-    container.config.google.auth_password.from_value(settings.google.auth_password)
-    container.config.google.api_key.from_value(settings.google.api_key)
-    container.config.google.project_id.from_value(settings.google.project_id)
-    container.config.google.credentials_path.from_value(
-        settings.google.credentials_path
-    )
-
-    container.config.mibot.api_base_url.from_value(settings.mibot.api_base_url)
-    container.config.mibot.project_uid.from_value(settings.mibot.project_uid)
-    container.config.mibot.client_uid.from_value(settings.mibot.client_uid)
-
-    container.config.api.timeout.from_value(settings.api.timeout)
-    container.config.api.max_retries.from_value(settings.api.max_retries)
-
-    # container.config.from_yaml("config/config.yaml")
-    # container.config.from_env("APP", as_=dict)
+    container.config.from_dict(settings.to_container_config())
 
     # Wire the container
     container.wire(
         modules=[
-            "src.adapters.input.api.routes.pdp_routes",
-            "src.adapters.input.api.routes.health_routes",
+            "src.adapters.input_adapters.api.routes.pdp_routes",
+            "src.adapters.input_adapters.api.routes.health_routes",
         ]
     )
 
-    app.state.container = container
+    fastapi.state.container = container
 
     logger.info("Application startup complete")
 
@@ -60,7 +40,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down application")
-    # Cleanup resources if needed
 
 
 def create_app() -> FastAPI:
@@ -68,7 +47,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.name,
-        description="Telefonica PDP Analytics",
+        description="PDP Analytics",
         version="1.0.0",
         debug=settings.debug,
         lifespan=lifespan,
@@ -101,7 +80,7 @@ app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run(
-        "src.adapters.input.api.main:app",
+        "src.adapters.input_adapters.api.main:app",
         host=settings.api.host,
         port=settings.api.port,
         reload=settings.debug,
