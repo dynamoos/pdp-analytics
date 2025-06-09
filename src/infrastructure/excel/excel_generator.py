@@ -44,9 +44,15 @@ class ExcelGenerator:
         """Create a sheet with data"""
         df = pd.DataFrame(sheet_config.data)
 
+        # Ensure columns are in the correct order based on headers
         if sheet_config.headers:
-            existing_columns = [h for h in sheet_config.headers if h in df.columns]
-            df = df[existing_columns]
+            # Reorder columns to match headers
+            ordered_columns = []
+            for header in sheet_config.headers:
+                if header in df.columns:
+                    ordered_columns.append(header)
+
+            df = df[ordered_columns]
 
         df.to_excel(writer, sheet_name=sheet_config.sheet_name, index=False)
 
@@ -57,6 +63,12 @@ class ExcelGenerator:
                 col_idx = df.columns.get_loc(col) if col in df.columns else None
                 if col_idx is not None:
                     worksheet.set_column(col_idx, col_idx, width)
+
+    @staticmethod
+    def _apply_filters(worksheet, sheet_config: SheetConfig) -> None:
+        """Apply filters to the worksheet"""
+        df = pd.DataFrame(sheet_config.data)
+        worksheet.autofilter(0, 0, len(df), len(df.columns) - 1)
 
     @staticmethod
     def _apply_heatmap(workbook, worksheet, sheet_config: SheetConfig) -> None:
@@ -121,25 +133,28 @@ class ExcelGenerator:
         for col_idx in range(len(df.columns)):
             worksheet.write(0, col_idx, df.columns[col_idx], header_format)
 
-        # Find numeric columns (days) - ahora ordenados
-        numeric_columns = []
+        # Find numeric columns (days)
+        day_columns = []
         for col in df.columns:
-            if isinstance(col, int) or (
-                isinstance(col, str) and col.isdigit() and 1 <= int(col) <= 31
-            ):
-                numeric_columns.append(col)
-
-        # Ordenar columnas numéricas
-        numeric_columns = sorted(numeric_columns, key=lambda x: int(x))
+            if col.isdigit() and 1 <= int(col) <= 31:
+                day_columns.append(col)
 
         # Apply conditional formatting to each cell
         for row_idx in range(len(df)):
-            for col in numeric_columns:
+            # Format DNI and SUPERVISOR columns
+            for col_idx, col in enumerate(df.columns):
+                if col in ["DNI", "SUPERVISOR"]:
+                    worksheet.write(
+                        row_idx + 1, col_idx, df.iloc[row_idx][col], format_white
+                    )
+
+            # Format day columns
+            for col in day_columns:
                 col_idx = df.columns.get_loc(col)
                 cell_value = df.iloc[row_idx][col]
 
-                # Skip if value is empty or NaN
-                if pd.isna(cell_value) or cell_value == "":
+                # Handle empty, NaN, or empty string
+                if pd.isna(cell_value) or cell_value == "" or cell_value is None:
                     worksheet.write(row_idx + 1, col_idx, "", format_white)
                 else:
                     try:
@@ -152,7 +167,7 @@ class ExcelGenerator:
                             worksheet.write(row_idx + 1, col_idx, value, format_red)
                         else:
                             worksheet.write(row_idx + 1, col_idx, "", format_white)
-                    except:
+                    except (ValueError, TypeError):
                         worksheet.write(row_idx + 1, col_idx, "", format_white)
 
         # Format para la columna Promedio (con fondo azul claro)
@@ -176,13 +191,18 @@ class ExcelGenerator:
                 worksheet.write(row_idx + 1, avg_idx, value, format_average)
 
         # Set column widths
-        worksheet.set_column(0, 0, 10)  # DNI
-        worksheet.set_column(1, 1, 35)  # SUPERVISOR
-        for idx, col in enumerate(numeric_columns):
+        worksheet.set_column(0, 0, 12)  # DNI
+        worksheet.set_column(1, 1, 40)  # SUPERVISOR
+
+        # Day columns
+        for col in day_columns:
             col_idx = df.columns.get_loc(col)
-            worksheet.set_column(col_idx, col_idx, 5)  # Days columns
+            worksheet.set_column(col_idx, col_idx, 6)
 
         # Promedio column
         if "Promedio" in df.columns:
             avg_idx = df.columns.get_loc("Promedio")
-            worksheet.set_column(avg_idx, avg_idx, 10)
+            worksheet.set_column(avg_idx, avg_idx, 12)
+
+        # Freeze panes (optional - keeps headers visible when scrolling)
+        worksheet.freeze_panes(1, 2)  # Freeze first row and first two columns

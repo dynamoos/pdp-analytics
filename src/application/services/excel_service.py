@@ -28,17 +28,19 @@ class ExcelService:
     ) -> str:
         logger.info(f"Generating Excel report for {len(pdp_records)} records")
 
-        heatmap_data = self._prepare_heatmap_data(pdp_records)
+        # Get unique days from data and sort them
+        unique_days = sorted(set(record.record_date.day for record in pdp_records))
+
+        # Prepare the data
+        heatmap_data = self._prepare_heatmap_data(pdp_records, unique_days)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"pdp_report_{timestamp}.xlsx"
         filepath = self._output_path / filename
 
-        # Get unique days from data
-        unique_days = sorted(set(record.record_date.day for record in pdp_records))
+        # Create headers with sorted day columns
         day_columns = [str(day) for day in unique_days]
-
-        headers = ["DNI", "SUPERVISOR"] + day_columns + ["Total"]
+        headers = ["DNI", "SUPERVISOR"] + day_columns + ["Promedio"]
 
         sheet_configs = [
             SheetConfig(
@@ -59,33 +61,52 @@ class ExcelService:
         return str(filepath)
 
     @staticmethod
-    def _prepare_heatmap_data(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
+    def _prepare_heatmap_data(
+        pdp_records: List[PDPRecord], unique_days: List[int]
+    ) -> List[Dict[str, Any]]:
         """Prepare data for heatmap visualization"""
 
         agent_data = {}
 
         logger.info(f"Preparing heatmap for {len(pdp_records)} records")
 
+        # Initialize agent data structure
         for record in pdp_records:
             if record.dni not in agent_data:
                 agent_data[record.dni] = {
                     "DNI": record.dni,
                     "SUPERVISOR": record.agent_name,
-                    "days_with_data": 0,
-                    "Total": 0,
+                    "days_data": {},
+                    "total": 0,
+                    "count": 0,
                 }
-            day = str(record.record_date.day)
-            agent_data[record.dni][day] = float(record.promises_per_hour)
-            agent_data[record.dni]["days_with_data"] += 1
-            agent_data[record.dni]["Total"] += float(record.promises_per_hour)
 
-        # Round totals
-        for agent in agent_data.values():
-            days_count = agent.pop("days_with_data")
-            total = agent.pop("Total")
-            if days_count > 0:
-                agent["Promedio"] = round(total / days_count, 2)
+            # Store the data for the specific day
+            day = record.record_date.day
+            agent_data[record.dni]["days_data"][day] = float(record.promises_per_hour)
+            agent_data[record.dni]["total"] += float(record.promises_per_hour)
+            agent_data[record.dni]["count"] += 1
+
+        # Convert to final format
+        result = []
+        for dni, data in agent_data.items():
+            row = {"DNI": data["DNI"], "SUPERVISOR": data["SUPERVISOR"]}
+
+            # Add data for each day in the correct order
+            for day in unique_days:
+                day_str = str(day)
+                if day in data["days_data"]:
+                    row[day_str] = data["days_data"][day]
+                else:
+                    row[day_str] = ""  # Empty cell for days without data
+
+            # Calculate average
+            if data["count"] > 0:
+                row["Promedio"] = round(data["total"] / data["count"], 2)
             else:
-                agent["Promedio"] = 0
+                row["Promedio"] = 0
 
-        return sorted(agent_data.values(), key=lambda x: x["Promedio"], reverse=True)
+            result.append(row)
+
+        # Sort by average (descending)
+        return sorted(result, key=lambda x: x["Promedio"], reverse=True)
