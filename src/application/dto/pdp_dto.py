@@ -1,15 +1,14 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
 class PDPRequestDTO:
     """DTO for PDP processing request"""
 
-    start_date: date
-    end_date: date
+    reference_date: date
 
 
 @dataclass
@@ -17,17 +16,18 @@ class PDPResponseDTO:
     """DTO for PDP processing response"""
 
     total_records: int
-    total_pdps: int
-    total_amount: Decimal
+    unique_agents: int
+    average_productivity: Decimal
     excel_file_path: str
     processing_time_seconds: float
-    errors: List[str] = None
+    period: str
+    errors: Optional[List[str]] = None
 
     def __post_init__(self):
-        if self.total_amount is not None:
-            self.total_amount = Decimal(str(self.total_amount)).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+        if self.average_productivity is not None:
+            self.average_productivity = Decimal(
+                str(self.average_productivity)
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         if self.processing_time_seconds is not None:
             self.processing_time_seconds = round(self.processing_time_seconds, 2)
 
@@ -41,10 +41,11 @@ class PDPResponseDTO:
         """Create an empty response when no data is found"""
         return cls(
             total_records=0,
-            total_pdps=0,
-            total_amount=Decimal("0"),
+            unique_agents=0,
+            average_productivity=Decimal("0"),
             excel_file_path="",
             processing_time_seconds=processing_time,
+            period="",
             errors=errors or [],
         )
 
@@ -55,9 +56,10 @@ class PDPResponseDTO:
         """Create a response with error"""
         return cls(
             total_records=0,
-            total_pdps=0,
-            total_amount=Decimal("0"),
+            unique_agents=0,
+            average_productivity=Decimal("0"),
             excel_file_path="",
             processing_time_seconds=processing_time,
+            period="",
             errors=[error_message],
         )

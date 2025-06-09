@@ -12,7 +12,6 @@ class UseCaseModule(containers.DeclarativeContainer):
     # Process PDP Data Use Case
     process_pdp_data = providers.Factory(
         ProcessPDPDataUseCase,
-        pdp_repository=repositories.pdp_repository,
-        call_repository=repositories.call_repository,
+        productivity_repository=repositories.productivity_repository,
         excel_service=services.excel_service,
     )

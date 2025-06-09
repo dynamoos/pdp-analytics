@@ -5,12 +5,10 @@ from typing import List
 from src.domain.entities.pdp_record import PDPRecord
 
 
-class PDPRepository(ABC):
+class ProductivityRepository(ABC):
     """Repository interface for PDP records"""
 
     @abstractmethod
-    async def get_by_filters(
-        self, dates: List[date], agent_emails: List[str]
-    ) -> List[PDPRecord]:
-        """Get PDP records filtered by specific dates and emails"""
+    async def get_by_filters(self, start_date: date, end_date: date) -> List[PDPRecord]:
+        """Get PDP records filtered by specific dates"""
         pass

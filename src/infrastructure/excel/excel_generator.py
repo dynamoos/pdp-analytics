@@ -59,15 +59,6 @@ class ExcelGenerator:
                     worksheet.set_column(col_idx, col_idx, width)
 
     @staticmethod
-    def _apply_filters(worksheet, sheet_config: SheetConfig) -> None:
-        """Apply autofilters to worksheet"""
-        df = pd.DataFrame(sheet_config.data)
-        if not df.empty:
-            last_row = len(df)
-            last_col = len(df.columns) - 1
-            worksheet.autofilter(0, 0, last_row, last_col)
-
-    @staticmethod
     def _apply_heatmap(workbook, worksheet, sheet_config: SheetConfig) -> None:
         """Apply heatmap formatting to numeric columns"""
         df = pd.DataFrame(sheet_config.data)
@@ -130,13 +121,16 @@ class ExcelGenerator:
         for col_idx in range(len(df.columns)):
             worksheet.write(0, col_idx, df.columns[col_idx], header_format)
 
-        # Find numeric columns (days)
+        # Find numeric columns (days) - ahora ordenados
         numeric_columns = []
         for col in df.columns:
             if isinstance(col, int) or (
                 isinstance(col, str) and col.isdigit() and 1 <= int(col) <= 31
             ):
                 numeric_columns.append(col)
+
+        # Ordenar columnas numéricas
+        numeric_columns = sorted(numeric_columns, key=lambda x: int(x))
 
         # Apply conditional formatting to each cell
         for row_idx in range(len(df)):
@@ -161,6 +155,26 @@ class ExcelGenerator:
                     except:
                         worksheet.write(row_idx + 1, col_idx, "", format_white)
 
+        # Format para la columna Promedio (con fondo azul claro)
+        format_average = workbook.add_format(
+            {
+                "bg_color": "#DCE6F1",
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+                "num_format": "0.00",
+                "bold": True,
+            }
+        )
+
+        # Aplicar formato a la columna Promedio
+        if "Promedio" in df.columns:
+            avg_idx = df.columns.get_loc("Promedio")
+            for row_idx in range(len(df)):
+                value = df.iloc[row_idx]["Promedio"]
+                worksheet.write(row_idx + 1, avg_idx, value, format_average)
+
         # Set column widths
         worksheet.set_column(0, 0, 10)  # DNI
         worksheet.set_column(1, 1, 35)  # SUPERVISOR
@@ -168,7 +182,7 @@ class ExcelGenerator:
             col_idx = df.columns.get_loc(col)
             worksheet.set_column(col_idx, col_idx, 5)  # Days columns
 
-        # Total column
-        if "Total" in df.columns:
-            total_idx = df.columns.get_loc("Total")
-            worksheet.set_column(total_idx, total_idx, 8)
+        # Promedio column
+        if "Promedio" in df.columns:
+            avg_idx = df.columns.get_loc("Promedio")
+            worksheet.set_column(avg_idx, avg_idx, 10)

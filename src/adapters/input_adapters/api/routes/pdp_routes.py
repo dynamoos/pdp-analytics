@@ -18,14 +18,7 @@ async def process_pdp_data(
     request: PDPRequestDTO, use_case: ProcessPDPDataUseCase
 ) -> PDPResponseDTO:
     try:
-        logger.info(
-            f"Processing PDP data from {request.start_date} to {request.end_date}"
-        )
-
-        if request.start_date > request.end_date:
-            raise HTTPException(
-                status_code=400, detail="Start date must be before or equal to end date"
-            )
+        logger.info(f"Processing PDP data from reference date{request.reference_date}")
 
         result = await use_case.execute(request)
 

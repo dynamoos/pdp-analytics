@@ -1,10 +1,7 @@
 from dependency_injector import containers, providers
 
 from src.adapters.output_adapters.persistence.bigquery_pdp_repository import (
-    BigQueryPDPRepository,
-)
-from src.adapters.output_adapters.persistence.postgres_call_repository import (
-    PostgresCallRepository,
+    BigQueryProductivityRepository,
 )
 
 
@@ -14,11 +11,6 @@ class RepositoryModule(containers.DeclarativeContainer):
     database = providers.DependenciesContainer()
 
     # PDP Repository
-    pdp_repository = providers.Singleton(
-        BigQueryPDPRepository, client=database.bigquery_client
-    )
-
-    # Call Repository
-    call_repository = providers.Singleton(
-        PostgresCallRepository, postgres_manager=database.postgres_manager
+    productivity_repository = providers.Singleton(
+        BigQueryProductivityRepository, client=database.bigquery_client
     )
