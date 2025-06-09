@@ -3,6 +3,7 @@ from dependency_injector import containers, providers
 from src.infrastructure.di.modules import (
     DatabaseModule,
     RepositoryModule,
+    ServiceModule,
     UseCaseModule,
 )
 
@@ -17,5 +18,7 @@ class Container(containers.DeclarativeContainer):
 
     repositories = providers.Container(RepositoryModule, database=database)
 
-    # services = providers.Container(ServiceModule, config=config)
-    use_cases = providers.Container(UseCaseModule, repositories=repositories)
+    services = providers.Container(ServiceModule, config=config)
+    use_cases = providers.Container(
+        UseCaseModule, repositories=repositories, services=services
+    )
