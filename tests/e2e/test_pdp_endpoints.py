@@ -21,7 +21,7 @@ os.environ.update(
 
 from fastapi.testclient import TestClient
 
-from src.adapters.input.api.main import app
+from src.adapters.input_adapters.api.main import app
 from src.application.dto.pdp_dto import PDPResponseDTO
 
 
@@ -32,7 +32,7 @@ class TestPDPEndpoints:
     def client(self):
         """Create test client with mocked container"""
         # Mock the container to avoid DI initialization
-        with patch("src.adapters.input.api.main.Container") as mock_container:
+        with patch("src.adapters.input_adapters.api.main.Container") as mock_container:
             mock_instance = Mock()
             mock_container.return_value = mock_instance
 
@@ -136,7 +136,7 @@ class TestPDPEndpointsWithMocks:
         )
 
     @patch("src.infrastructure.di.container.Container")
-    @patch("src.adapters.input.api.routes.pdp_routes.Depends")
+    @patch("src.adapters.input_adapters.api.routes.pdp_routes.Depends")
     def test_process_pdp_success(
         self, mock_depends, mock_container, mock_use_case_response
     ):

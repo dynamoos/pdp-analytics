@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from typing import Optional
@@ -34,12 +34,7 @@ class PDPRecord:
     documents_with_debt: int
     average_amount_per_document: Decimal
 
-    # From API calls (optional)
     total_connected_seconds: Optional[int] = None
-    total_time_hms: Optional[str] = None
-
-    # Calculated metric for heatmap
-    pdp_per_hour: Optional[Decimal] = None
 
     def __post_init__(self):
         """Entity validations"""
@@ -56,22 +51,18 @@ class PDPRecord:
             raise ValueError(f"Invalid service type: {self.service_type}")
 
     @property
-    def average_pdp_per_day(self) -> float:
-        """Calculate average PDPs per day"""
-        if self.days_with_pdp == 0:
-            return 0.0
-        return self.pdp_count / self.days_with_pdp
+    def connected_hours(self) -> str:
+        hours = self.total_connected_seconds // 3600
+        minutes = (self.total_connected_seconds % 3600) // 60
+        seconds = self.total_connected_seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     @property
-    def effectiveness_rate(self) -> float:
-        """Calculate effectiveness (documents with debt / total operations)"""
-        if self.total_pdp_operations == 0:
-            return 0.0
-        return self.documents_with_debt / self.total_pdp_operations
+    def pdp_per_hour(self) -> Decimal:
+        if self.total_connected_seconds and self.total_connected_seconds > 0:
+            hours = Decimal(str(self.total_connected_seconds)) / Decimal("3600")
+            return Decimal(str(self.pdp_count)) / hours
+        return Decimal("0")
 
-    @property
-    def connected_hours(self) -> Optional[float]:
-        """Convert seconds to hours if available"""
-        if self.total_connected_seconds is None:
-            return None
-        return self.total_connected_seconds / 3600
+    def with_connected_time(self, seconds: Optional[int]) -> "PDPRecord":
+        return replace(self, total_connected_seconds=seconds)

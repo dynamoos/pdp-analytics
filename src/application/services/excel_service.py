@@ -14,14 +14,20 @@ from src.shared.constants import EXCEL_OUTPUT_PATH, ExcelHeaders
 class ExcelService:
     """Service for generating Excel reports"""
 
-    def __init__(self, output_path: str = EXCEL_OUTPUT_PATH):
+    def __init__(
+        self,
+        output_path: str = EXCEL_OUTPUT_PATH,
+        excel_generator: ExcelGenerator = None,
+        heatmap_formatter: HeatmapFormatter = None,
+    ):
         self._output_path = Path(output_path)
         self._output_path.mkdir(exist_ok=True)
-        self._excel_generator = ExcelGenerator()
-        self._heatmap_formatter = HeatmapFormatter()
+        self._excel_generator = excel_generator or ExcelGenerator()
+        self._heatmap_formatter = heatmap_formatter or HeatmapFormatter()
 
     async def generate_pdp_report(
-        self, pdp_records: List[PDPRecord], include_heatmap: bool = True
+        self,
+        pdp_records: List[PDPRecord],
     ) -> str:
         logger.info(f"Generating Excel report for {len(pdp_records)} records")
 
@@ -40,21 +46,36 @@ class ExcelService:
             )
         ]
 
-        if include_heatmap:
-            logger.info("Generating heatmap data...")
-            heatmap_data = self._prepare_heatmap_data(pdp_records)
+        logger.info("Generating heatmap data...")
+        heatmap_data = self._prepare_heatmap_data(pdp_records)
+
+        if heatmap_data:
             logger.info(f"Heatmap data prepared: {len(heatmap_data)} rows")
+
+            # Obtener las columnas del primer registro para determinar los días
+            first_row = heatmap_data[0] if heatmap_data else {}
+            day_columns = [
+                str(k)
+                for k in sorted(
+                    [
+                        col
+                        for col in first_row.keys()
+                        if isinstance(col, int)
+                        or (isinstance(col, str) and col.isdigit())
+                    ]
+                )
+            ]
+
+            headers = ["DNI", "SUPERVISOR"] + day_columns + ["Total"]
+
             sheet_configs.append(
                 SheetConfig(
                     sheet_name="Mapa_Calor",
                     data=heatmap_data,
-                    headers=["DNI", "Nombre", "Supervisor"]
-                    + [str(i) for i in range(1, 32)],
+                    headers=headers,
                     heatmap_config=HeatmapConfig(value_column="pdp_per_hour"),
                 )
             )
-        else:
-            logger.warning("No heatmap data to generate")
 
         excel_dto = ExcelGenerationDTO(
             output_filename=str(filepath), sheet_configs=sheet_configs
@@ -84,10 +105,8 @@ class ExcelService:
                 ExcelHeaders.PDP_COUNT: record.pdp_count,
                 ExcelHeaders.TOTAL_OPERATIONS: record.total_pdp_operations,
                 ExcelHeaders.MANAGED_AMOUNT: float(record.total_managed_amount),
-                ExcelHeaders.CONNECTED_TIME: record.total_time_hms or "00:00:00",
-                "PDPs por Hora": (
-                    float(record.pdp_per_hour) if record.pdp_per_hour else 0
-                ),
+                ExcelHeaders.CONNECTED_TIME: record.connected_hours or "00:00:00",
+                ExcelHeaders.PDP_HOURS: float(record.pdp_per_hour),
             }
             for record in pdp_records
         ]
@@ -96,17 +115,19 @@ class ExcelService:
         self, pdp_records: List[PDPRecord]
     ) -> List[Dict[str, Any]]:
         """Prepare data for heatmap visualization"""
-        # Group records by month
+
+        if not pdp_records:
+            return []
+
         logger.info(f"Preparing heatmap for {len(pdp_records)} records")
+
+        # Agrupar registros por mes
         records_by_month = {}
         for record in pdp_records:
             month_key = (record.period.year, record.period.month)
             if month_key not in records_by_month:
                 records_by_month[month_key] = []
-            logger.debug(
-                f"Record: {record.dni} - Day: {record.record_date.day} - "
-                f"PDPs/hour: {record.pdp_per_hour}"
-            )
+
             records_by_month[month_key].append(
                 {
                     "dni": record.dni,
@@ -117,16 +138,26 @@ class ExcelService:
                     ),
                 }
             )
-        # For now, use the first month (or implement month selection)
-        if records_by_month:
-            (year, month), month_records = list(records_by_month.items())[0]
-            heatmap_df = self._heatmap_formatter.format_productivity_heatmap(
-                month_records, month, year
-            )
-            return heatmap_df.to_dict("records")
-        logger.info(f"Records grouped by month: {list(records_by_month.keys())}")
 
-        return []
+        # Si hay datos de múltiples meses, usar todos
+        all_heatmap_data = []
+
+        for (year, month), month_records in records_by_month.items():
+            logger.info(
+                f"Processing month {year}-{month:02d} with {len(month_records)} records"
+            )
+
+            heatmap_df = self._heatmap_formatter.format_productivity_heatmap(
+                month_records
+            )
+
+            # Si hay múltiples meses, podrías agregar una columna de mes
+            if len(records_by_month) > 1:
+                heatmap_df["Periodo"] = f"{year}-{month:02d}"
+
+            all_heatmap_data.extend(heatmap_df.to_dict("records"))
+
+        return all_heatmap_data
 
     def _generate_excel_file(self, excel_dto: ExcelGenerationDTO):
         """Generate Excel file using infrastructure component"""

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
 
@@ -10,8 +10,6 @@ class PDPRequestDTO:
 
     start_date: date
     end_date: date
-    include_call_data: bool = True
-    generate_heatmap: bool = True
 
 
 @dataclass
@@ -25,15 +23,41 @@ class PDPResponseDTO:
     processing_time_seconds: float
     errors: List[str] = None
 
+    def __post_init__(self):
+        if self.total_amount is not None:
+            self.total_amount = Decimal(str(self.total_amount)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        if self.processing_time_seconds is not None:
+            self.processing_time_seconds = round(self.processing_time_seconds, 2)
 
-@dataclass
-class AgentMetricsDTO:
-    """DTO for agent metrics in heatmap"""
+        if self.errors is None:
+            self.errors = []
 
-    dni: str
-    agent_name: str
-    date: date
-    pdp_count: int
-    connected_hours: float
-    pdp_per_hour: float
-    total_amount: Decimal
+    @classmethod
+    def empty(
+        cls, processing_time: float = 0.0, errors: List[str] = None
+    ) -> "PDPResponseDTO":
+        """Create an empty response when no data is found"""
+        return cls(
+            total_records=0,
+            total_pdps=0,
+            total_amount=Decimal("0"),
+            excel_file_path="",
+            processing_time_seconds=processing_time,
+            errors=errors or [],
+        )
+
+    @classmethod
+    def with_error(
+        cls, error_message: str, processing_time: float = 0.0
+    ) -> "PDPResponseDTO":
+        """Create a response with error"""
+        return cls(
+            total_records=0,
+            total_pdps=0,
+            total_amount=Decimal("0"),
+            excel_file_path="",
+            processing_time_seconds=processing_time,
+            errors=[error_message],
+        )

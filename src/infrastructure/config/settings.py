@@ -15,28 +15,44 @@ class GoogleSettings(BaseSettings):
     credentials_path: Optional[str] = Field(
         None, alias="GOOGLE_APPLICATION_CREDENTIALS"
     )
-    auth_email: str = Field(..., alias="GOOGLE_AUTH_EMAIL")
-    auth_password: str = Field(..., alias="GOOGLE_AUTH_PASSWORD")
-    api_key: str = Field(..., alias="GOOGLE_API_KEY")
+    location: str = Field(
+        "us-east1",
+        alias="GCP_BIGQUERY_LOCATION",
+    )
 
-    model_config = ConfigDict(env_file=".env", populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     @field_validator("credentials_path")
     def validate_credentials_path(cls, v):
         if v and not Path(v).exists():
-            # Solo advertir, no fallar si el archivo no existe en tests
             print(f"Warning: Credentials file not found: {v}")
         return v
 
 
-class MibotSettings(BaseSettings):
-    """Mibot API settings"""
+class PostgresSettings(BaseSettings):
+    """PostgreSQL configuration with validation"""
 
-    api_base_url: str = Field("https://app.mibot.cl", alias="MIBOT_API_BASE_URL")
-    project_uid: str = Field(..., alias="MIBOT_PROJECT_UID")
-    client_uid: str = Field(..., alias="MIBOT_CLIENT_UID")
+    host: str = Field(..., alias="POSTGRES_HOST")
+    port: int = Field(5432, alias="POSTGRES_PORT")
+    database: str = Field(..., alias="POSTGRES_DB")
+    user: str = Field(..., alias="POSTGRES_USER")
+    password: str = Field(..., alias="POSTGRES_PASSWORD")
 
-    model_config = ConfigDict(env_file=".env", populate_by_name=True, extra="ignore")
+    min_pool_size: int = Field(5, alias="POSTGRES_MIN_POOL_SIZE")
+    max_pool_size: int = Field(20, alias="POSTGRES_MAX_POOL_SIZE")
+    ssl_mode: str = Field("prefer", alias="POSTGRES_SSL_MODE")
+
+    @property
+    def connection_string(self) -> str:
+        base = f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        params = []
+        if self.ssl_mode != "disable":
+            params.append(f"sslmode={self.ssl_mode}")
+        if params:
+            return f"{base}?{'&'.join(params)}"
+        return base
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
 class APISettings(BaseSettings):
@@ -49,7 +65,7 @@ class APISettings(BaseSettings):
     max_retries: int = Field(3, alias="API_MAX_RETRIES")
     max_concurrent_calls: int = Field(10, alias="MAX_CONCURRENT_API_CALLS")
 
-    model_config = ConfigDict(env_file=".env", populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
 class ExcelSettings(BaseSettings):
@@ -58,7 +74,7 @@ class ExcelSettings(BaseSettings):
     output_path: str = Field("./output", alias="EXCEL_OUTPUT_PATH")
     template_path: str = Field("./templates", alias="EXCEL_TEMPLATE_PATH")
 
-    model_config = ConfigDict(env_file=".env", populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     @field_validator("output_path", "template_path")
     def create_directory(cls, v):
@@ -77,16 +93,13 @@ class AppSettings(BaseSettings):
 
     # Cached instances
     _google: Optional[GoogleSettings] = None
-    _mibot: Optional[MibotSettings] = None
+    _postgres: Optional[PostgresSettings] = None
     _api: Optional[APISettings] = None
     _excel: Optional[ExcelSettings] = None
 
     model_config = ConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
         populate_by_name=True,
-        extra="ignore",  # Esto es clave - ignora campos extras
+        extra="ignore",
     )
 
     @property
@@ -96,10 +109,10 @@ class AppSettings(BaseSettings):
         return self._google
 
     @property
-    def mibot(self) -> MibotSettings:
-        if self._mibot is None:
-            self._mibot = MibotSettings()
-        return self._mibot
+    def postgres(self) -> PostgresSettings:
+        if self._postgres is None:
+            self._postgres = PostgresSettings()
+        return self._postgres
 
     @property
     def api(self) -> APISettings:
@@ -112,6 +125,25 @@ class AppSettings(BaseSettings):
         if self._excel is None:
             self._excel = ExcelSettings()
         return self._excel
+
+    def to_container_config(self) -> dict:
+        """Convert all settings to container config format"""
+
+        postgres_config = self.postgres.model_dump()
+        postgres_config["connection_string"] = self.postgres.connection_string
+
+        return {
+            "google": self.google.model_dump(),
+            "postgres": postgres_config,
+            "api": self.api.model_dump(),
+            "excel": self.excel.model_dump(),
+            "app": {
+                "env": self.env,
+                "name": self.name,
+                "debug": self.debug,
+                "log_level": self.log_level,
+            },
+        }
 
 
 # Global settings instance

@@ -9,10 +9,8 @@ class PDPRepository(ABC):
     """Repository interface for PDP records"""
 
     @abstractmethod
-    async def get_by_date_range(
-        self,
-        start_date: date,
-        end_date: date,
+    async def get_by_filters(
+        self, dates: List[date], agent_emails: List[str]
     ) -> List[PDPRecord]:
-        """Get PDP records within a date range"""
+        """Get PDP records filtered by specific dates and emails"""
         pass

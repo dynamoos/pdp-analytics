@@ -1,6 +1,5 @@
-from dataclasses import dataclass
 import re
-from typing import Pattern
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -23,16 +22,6 @@ class Email:
     def normalized(self) -> str:
         """Return email in lowercase"""
         return self.value.lower()
-
-    @property
-    def api_format(self) -> str:
-        """Transform email for API usage (@ -> _)"""
-        return self.normalized.replace("@", "_")
-
-    @property
-    def domain(self) -> str:
-        """Extract domain from email"""
-        return self.value.split("@")[1]
 
     def __str__(self) -> str:
         return self.value

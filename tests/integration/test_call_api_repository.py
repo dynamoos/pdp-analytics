@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.adapters.output.external_apis.http_call_api_repository import (
+from src.adapters.output_adapters.external_apis.http_call_api_repository import (
     HttpCallApiRepository,
 )
 from src.domain.entities.call_data import AgentCallData, CallApiResponse

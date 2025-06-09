@@ -7,20 +7,8 @@ class DomainException(Exception):
     pass
 
 
-class EntityValidationError(DomainException):
-    """Raised when entity validation fails"""
-
-    pass
-
-
 class RepositoryException(Exception):
     """Base exception for repository errors"""
-
-    pass
-
-
-class DataNotFoundException(RepositoryException):
-    """Raised when requested data is not found"""
 
     pass
 

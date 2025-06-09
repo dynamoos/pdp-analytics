@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.adapters.output.database.bigquery_pdp_repository import BigQueryPDPRepository
+from src.adapters.output_adapters.persistence.bigquery_pdp_repository import (
+    BigQueryPDPRepository,
+)
 from src.domain.entities.pdp_record import PDPRecord
 from src.domain.value_objects.email import Email
 from src.infrastructure.database.bigquery_client import BigQueryClient

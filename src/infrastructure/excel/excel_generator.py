@@ -2,7 +2,6 @@ import pandas as pd
 from loguru import logger
 
 from src.application.dto.excel_dto import ExcelGenerationDTO, SheetConfig
-from src.shared.constants import HEATMAP_COLOR_SCALE
 
 
 class ExcelGenerator:
@@ -40,18 +39,15 @@ class ExcelGenerator:
             logger.error(f"Error generating Excel: {str(e)}")
             raise
 
-    def _create_sheet(self, writer: pd.ExcelWriter, sheet_config: SheetConfig) -> None:
+    @staticmethod
+    def _create_sheet(writer: pd.ExcelWriter, sheet_config: SheetConfig) -> None:
         """Create a sheet with data"""
-        # Convert data to DataFrame
         df = pd.DataFrame(sheet_config.data)
 
-        # Reorder columns if headers are specified
         if sheet_config.headers:
-            # Only include columns that exist in the data
             existing_columns = [h for h in sheet_config.headers if h in df.columns]
             df = df[existing_columns]
 
-        # Write to Excel
         df.to_excel(writer, sheet_name=sheet_config.sheet_name, index=False)
 
         # Apply column widths if specified
@@ -62,52 +58,117 @@ class ExcelGenerator:
                 if col_idx is not None:
                     worksheet.set_column(col_idx, col_idx, width)
 
-    def _apply_filters(self, worksheet, sheet_config: SheetConfig) -> None:
+    @staticmethod
+    def _apply_filters(worksheet, sheet_config: SheetConfig) -> None:
         """Apply autofilters to worksheet"""
-        # Get dimensions
         df = pd.DataFrame(sheet_config.data)
         if not df.empty:
             last_row = len(df)
             last_col = len(df.columns) - 1
             worksheet.autofilter(0, 0, last_row, last_col)
 
-    def _apply_heatmap(self, workbook, worksheet, sheet_config: SheetConfig) -> None:
+    @staticmethod
+    def _apply_heatmap(workbook, worksheet, sheet_config: SheetConfig) -> None:
         """Apply heatmap formatting to numeric columns"""
         df = pd.DataFrame(sheet_config.data)
 
-        # Define formats for heatmap
-        format_green = workbook.add_format({"bg_color": HEATMAP_COLOR_SCALE["min"]})
-        format_yellow = workbook.add_format({"bg_color": HEATMAP_COLOR_SCALE["mid"]})
-        format_red = workbook.add_format({"bg_color": HEATMAP_COLOR_SCALE["max"]})
+        # Define formats for the heatmap with borders
+        format_red = workbook.add_format(
+            {
+                "bg_color": "#F8696B",
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+                "num_format": "0.00",
+            }
+        )
+        format_yellow = workbook.add_format(
+            {
+                "bg_color": "#FFEB84",
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+                "num_format": "0.00",
+            }
+        )
+        format_green = workbook.add_format(
+            {
+                "bg_color": "#63BE7B",
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+                "num_format": "0.00",
+            }
+        )
+        format_white = workbook.add_format(
+            {
+                "bg_color": "#FFFFFF",
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
 
-        # Find numeric columns (days 1-31)
+        # Header format
+        header_format = workbook.add_format(
+            {
+                "bg_color": "#366092",
+                "font_color": "#FFFFFF",
+                "bold": True,
+                "border": 1,
+                "border_color": "#D3D3D3",
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
+
+        # Apply header format
+        for col_idx in range(len(df.columns)):
+            worksheet.write(0, col_idx, df.columns[col_idx], header_format)
+
+        # Find numeric columns (days)
         numeric_columns = []
         for col in df.columns:
-            if isinstance(col, int):
-                if 1 <= col <= 31:
-                    numeric_columns.append(col)
-            elif isinstance(col, str) and col.isdigit():
-                if 1 <= int(col) <= 31:
-                    numeric_columns.append(col)
+            if isinstance(col, int) or (
+                isinstance(col, str) and col.isdigit() and 1 <= int(col) <= 31
+            ):
+                numeric_columns.append(col)
 
-        # Apply conditional formatting to each numeric column
-        for col in numeric_columns:
+        # Apply conditional formatting to each cell
+        for row_idx in range(len(df)):
+            for col in numeric_columns:
+                col_idx = df.columns.get_loc(col)
+                cell_value = df.iloc[row_idx][col]
+
+                # Skip if value is empty or NaN
+                if pd.isna(cell_value) or cell_value == "":
+                    worksheet.write(row_idx + 1, col_idx, "", format_white)
+                else:
+                    try:
+                        value = float(cell_value)
+                        if value >= 3:
+                            worksheet.write(row_idx + 1, col_idx, value, format_green)
+                        elif value >= 2:
+                            worksheet.write(row_idx + 1, col_idx, value, format_yellow)
+                        elif value > 0:
+                            worksheet.write(row_idx + 1, col_idx, value, format_red)
+                        else:
+                            worksheet.write(row_idx + 1, col_idx, "", format_white)
+                    except:
+                        worksheet.write(row_idx + 1, col_idx, "", format_white)
+
+        # Set column widths
+        worksheet.set_column(0, 0, 10)  # DNI
+        worksheet.set_column(1, 1, 35)  # SUPERVISOR
+        for idx, col in enumerate(numeric_columns):
             col_idx = df.columns.get_loc(col)
+            worksheet.set_column(col_idx, col_idx, 5)  # Days columns
 
-            # Apply 3-color scale
-            worksheet.conditional_format(
-                1,
-                col_idx,
-                len(df),
-                col_idx,
-                {
-                    "type": "3_color_scale",
-                    "min_color": HEATMAP_COLOR_SCALE["min"],
-                    "mid_color": HEATMAP_COLOR_SCALE["mid"],
-                    "max_color": HEATMAP_COLOR_SCALE["max"],
-                    "min_type": "min",
-                    "mid_type": "percentile",
-                    "max_type": "max",
-                    "mid_value": 50,
-                },
-            )
+        # Total column
+        if "Total" in df.columns:
+            total_idx = df.columns.get_loc("Total")
+            worksheet.set_column(total_idx, total_idx, 8)
