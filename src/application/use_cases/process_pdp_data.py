@@ -1,5 +1,4 @@
 import time
-from decimal import Decimal
 
 from loguru import logger
 
@@ -39,15 +38,7 @@ class ProcessPDPDataUseCase:
             records = await self._productivity_repository.get_by_filters(
                 start_date, end_date
             )
-            sin_dni_count = sum(1 for r in records if r.dni == "SIN DNI")
-            logger.info(
-                f"Found {len(records)} productivity records, including {sin_dni_count} with SIN DNI"
-            )
 
-            # Log a sample of SIN DNI records
-            sin_dni_records = [r for r in records if r.dni == "SIN DNI"]
-            if sin_dni_records:
-                logger.debug(f"Sample SIN DNI record: {sin_dni_records[0]}")
             if not records:
                 logger.warning("No productivity data found")
                 processing_time = time.time() - start_time
@@ -75,21 +66,12 @@ class ProcessPDPDataUseCase:
                 agent_hours[record.dni].add(record.hour)
                 total_pdp += record.pdp_count
 
-            # Total distinct hours across all agents
-            total_distinct_hours = sum(len(hours) for hours in agent_hours.values())
-
-            # Calculate average PDP per hour
-            avg_productivity = (
-                total_pdp / total_distinct_hours if total_distinct_hours > 0 else 0
-            )
-
             processing_time = time.time() - start_time
 
             return PDPResponseDTO(
                 total_records=len(records),
                 unique_agents=unique_agents,
-                average_productivity=Decimal(str(avg_productivity)),
-                excel_file_path=excel_path,
+                excel_file_path=excel_path.split("/")[-1],
                 processing_time_seconds=processing_time,
                 period=period.formatted,
                 errors=errors if errors else None,

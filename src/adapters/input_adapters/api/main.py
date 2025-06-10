@@ -10,6 +10,8 @@ from src.infrastructure.config.settings import settings
 from src.infrastructure.di.container import Container
 from src.infrastructure.logging.logger import setup_logging
 
+from .exception_handlers import setup_exception_handlers
+
 
 @asynccontextmanager
 async def lifespan(fastapi: FastAPI):
@@ -66,7 +68,7 @@ def create_app() -> FastAPI:
     # app.middleware("http")(error_handler_middleware)
 
     # Setup exception handlers
-    # setup_exception_handlers(app)
+    setup_exception_handlers(app)
 
     # Include routers
     app.include_router(health_routes.router, tags=["Health"])

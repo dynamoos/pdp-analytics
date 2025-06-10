@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 
 from loguru import logger
 
-from src.application.dto.excel_dto import ExcelGenerationDTO, HeatmapConfig, SheetConfig
-from src.domain.entities.pdp_record import PDPRecord
+from src.application.dto import ExcelGenerationDTO, HeatmapConfig, SheetConfig
+from src.domain.entities import PDPRecord
 from src.infrastructure.excel.excel_generator import ExcelGenerator
 from src.shared.constants import EXCEL_OUTPUT_PATH
 
@@ -194,5 +194,4 @@ class ExcelService:
 
             result.append(row)
 
-        # Sort by average PDP/hour descending
         return sorted(result, key=lambda x: x["Promedio"], reverse=True)

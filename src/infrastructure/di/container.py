@@ -19,6 +19,7 @@ class Container(containers.DeclarativeContainer):
     repositories = providers.Container(RepositoryModule, database=database)
 
     services = providers.Container(ServiceModule, config=config)
+
     use_cases = providers.Container(
         UseCaseModule, repositories=repositories, services=services
     )

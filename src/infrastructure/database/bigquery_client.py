@@ -6,7 +6,7 @@ from google.cloud.bigquery import ArrayQueryParameter, ScalarQueryParameter
 from google.oauth2 import service_account
 from loguru import logger
 
-from src.shared.exceptions import DatabaseException
+from src.shared import DatabaseException
 
 
 class BigQueryClient:

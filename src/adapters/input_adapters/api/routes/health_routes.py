@@ -4,7 +4,7 @@ from dependency_injector.wiring import inject
 from fastapi import APIRouter
 from loguru import logger
 
-from src.adapters.input_adapters.api.dependencies import BigQueryClient, PostgresManager
+from src.adapters.input_adapters.api.dependencies import BigQueryClient
 
 router = APIRouter()
 
@@ -21,9 +21,7 @@ async def health_check():
 
 @router.get("/health/detailed")
 @inject
-async def detailed_health_check(
-    bigquery_client: BigQueryClient, postgres_manager: PostgresManager
-):
+async def detailed_health_check(bigquery_client: BigQueryClient):
     """Detailed health check with dependencies status"""
     health_status = {
         "status": "healthy",
@@ -39,14 +37,4 @@ async def detailed_health_check(
         health_status["dependencies"]["bigquery"] = "unhealthy"
         health_status["status"] = "degraded"
         logger.error(f"BigQuery health check failed: {str(e)}")
-
-    # Check Postgres
-    try:
-        await postgres_manager.fetch_all("SELECT 1")
-        health_status["dependencies"]["postgres"] = "healthy"
-    except Exception as e:
-        health_status["dependencies"]["postgres"] = "unhealthy"
-        health_status["status"] = "degraded"
-        logger.error(f"Postgres health check failed: {str(e)}")
-
     return health_status

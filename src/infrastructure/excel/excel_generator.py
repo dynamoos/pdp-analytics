@@ -1,7 +1,7 @@
 import pandas as pd
 from loguru import logger
 
-from src.application.dto.excel_dto import ExcelGenerationDTO, SheetConfig
+from src.application.dto import ExcelGenerationDTO, SheetConfig
 
 
 class ExcelGenerator:

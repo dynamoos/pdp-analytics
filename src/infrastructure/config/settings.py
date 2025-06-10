@@ -29,32 +29,6 @@ class GoogleSettings(BaseSettings):
         return v
 
 
-class PostgresSettings(BaseSettings):
-    """PostgreSQL configuration with validation"""
-
-    host: str = Field(..., alias="POSTGRES_HOST")
-    port: int = Field(5432, alias="POSTGRES_PORT")
-    database: str = Field(..., alias="POSTGRES_DB")
-    user: str = Field(..., alias="POSTGRES_USER")
-    password: str = Field(..., alias="POSTGRES_PASSWORD")
-
-    min_pool_size: int = Field(5, alias="POSTGRES_MIN_POOL_SIZE")
-    max_pool_size: int = Field(20, alias="POSTGRES_MAX_POOL_SIZE")
-    ssl_mode: str = Field("prefer", alias="POSTGRES_SSL_MODE")
-
-    @property
-    def connection_string(self) -> str:
-        base = f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        params = []
-        if self.ssl_mode != "disable":
-            params.append(f"sslmode={self.ssl_mode}")
-        if params:
-            return f"{base}?{'&'.join(params)}"
-        return base
-
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-
 class APISettings(BaseSettings):
     """API configuration"""
 
@@ -93,7 +67,6 @@ class AppSettings(BaseSettings):
 
     # Cached instances
     _google: Optional[GoogleSettings] = None
-    _postgres: Optional[PostgresSettings] = None
     _api: Optional[APISettings] = None
     _excel: Optional[ExcelSettings] = None
 
@@ -107,12 +80,6 @@ class AppSettings(BaseSettings):
         if self._google is None:
             self._google = GoogleSettings()
         return self._google
-
-    @property
-    def postgres(self) -> PostgresSettings:
-        if self._postgres is None:
-            self._postgres = PostgresSettings()
-        return self._postgres
 
     @property
     def api(self) -> APISettings:
@@ -129,12 +96,8 @@ class AppSettings(BaseSettings):
     def to_container_config(self) -> dict:
         """Convert all settings to container config format"""
 
-        postgres_config = self.postgres.model_dump()
-        postgres_config["connection_string"] = self.postgres.connection_string
-
         return {
             "google": self.google.model_dump(),
-            "postgres": postgres_config,
             "api": self.api.model_dump(),
             "excel": self.excel.model_dump(),
             "app": {

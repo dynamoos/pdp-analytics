@@ -1,3 +1,3 @@
-from .injection import BigQueryClient, PostgresManager, ProcessPDPDataUseCase
+from .injection import BigQueryClient, ProcessPDPDataUseCase
 
-__all__ = ["PostgresManager", "BigQueryClient", "ProcessPDPDataUseCase"]
+__all__ = ["BigQueryClient", "ProcessPDPDataUseCase"]

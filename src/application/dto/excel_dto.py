@@ -3,11 +3,14 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
-class ExcelGenerationDTO:
-    """DTO for Excel generation parameters"""
+class HeatmapConfig:
+    """Configuration for heatmap formatting"""
 
-    output_filename: str
-    sheet_configs: List["SheetConfig"]
+    value_column: str
+    min_color: str = "#63BE7B"
+    mid_color: str = "#FFEB84"
+    max_color: str = "#F8696B"
+    include_borders: bool = True
 
 
 @dataclass
@@ -23,11 +26,8 @@ class SheetConfig:
 
 
 @dataclass
-class HeatmapConfig:
-    """Configuration for heatmap formatting"""
+class ExcelGenerationDTO:
+    """DTO for Excel generation parameters"""
 
-    value_column: str
-    min_color: str = "#63BE7B"
-    mid_color: str = "#FFEB84"
-    max_color: str = "#F8696B"
-    include_borders: bool = True
+    output_filename: str
+    sheet_configs: List["SheetConfig"]
