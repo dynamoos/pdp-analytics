@@ -10,7 +10,7 @@ from src.domain.value_objects.period import Period
 
 
 class ProcessPDPDataUseCase:
-    """Use case for processing PDP data with call enrichment"""
+    """Use case for processing PDP data"""
 
     def __init__(
         self,
@@ -26,7 +26,7 @@ class ProcessPDPDataUseCase:
         errors = []
 
         try:
-            # Calcular el rango del mes basado en la fecha proporcionada
+            # Calculate month range based on provided date
             period = Period.from_date(request.reference_date)
             start_date, end_date = period.get_date_range()
 
@@ -35,7 +35,7 @@ class ProcessPDPDataUseCase:
                 f"({start_date} to {end_date})"
             )
 
-            # Obtener datos de productividad
+            # Get productivity data
             records = await self._productivity_repository.get_by_filters(
                 start_date, end_date
             )
@@ -50,12 +50,29 @@ class ProcessPDPDataUseCase:
                 )
             logger.info(f"Found {len(records)} productivity records")
 
-            # Generar reporte Excel
+            # Generate Excel report
             excel_path = await self._excel_service.generate_pdp_report(records)
 
+            # Calculate statistics
             unique_agents = len(set(record.dni for record in records))
-            total_promises = sum(float(record.promises_per_hour) for record in records)
-            avg_productivity = total_promises / len(records) if records else 0
+
+            # Calculate total PDP and distinct hours for average
+            agent_hours = {}
+            total_pdp = 0
+
+            for record in records:
+                if record.dni not in agent_hours:
+                    agent_hours[record.dni] = set()
+                agent_hours[record.dni].add(record.hour)
+                total_pdp += record.pdp_count
+
+            # Total distinct hours across all agents
+            total_distinct_hours = sum(len(hours) for hours in agent_hours.values())
+
+            # Calculate average PDP per hour
+            avg_productivity = (
+                total_pdp / total_distinct_hours if total_distinct_hours > 0 else 0
+            )
 
             processing_time = time.time() - start_time
 

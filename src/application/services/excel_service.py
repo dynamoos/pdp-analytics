@@ -28,28 +28,61 @@ class ExcelService:
     ) -> str:
         logger.info(f"Generating Excel report for {len(pdp_records)} records")
 
-        # Get unique days from data and sort them
-        unique_days = sorted(set(record.record_date.day for record in pdp_records))
-
-        # Prepare the data
-        heatmap_data = self._prepare_heatmap_data(pdp_records, unique_days)
+        # Prepare data for both sheets
+        detailed_data = self._prepare_detailed_data(pdp_records)
+        heatmap_data = self._prepare_heatmap_data(pdp_records)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"pdp_report_{timestamp}.xlsx"
         filepath = self._output_path / filename
 
-        # Create headers with sorted day columns
+        # Get unique days from data
+        unique_days = sorted(set(record.record_date.day for record in pdp_records))
         day_columns = [str(day) for day in unique_days]
-        headers = ["DNI", "SUPERVISOR"] + day_columns + ["Promedio"]
+
+        # Headers for detailed sheet
+        detailed_headers = [
+            "Fecha",
+            "Hora",
+            "DNI",
+            "Ejecutivo",
+            "Total Gestiones",
+            "Contactos Efectivos",
+            "No Contactos",
+            "Contactos No Efectivos",
+            "Gestiones PDP",
+        ]
+
+        # Headers for heatmap sheet
+        heatmap_headers = ["DNI", "EJECUTIVO"] + day_columns + ["Promedio"]
 
         sheet_configs = [
+            # Detailed data sheet
             SheetConfig(
-                sheet_name="Productividad",
+                sheet_name="Detalle Por Hora",
+                data=detailed_data,
+                headers=detailed_headers,
+                apply_filters=True,
+                column_widths={
+                    "Fecha": 12,
+                    "Hora": 8,
+                    "DNI": 12,
+                    "Ejecutivo": 30,
+                    "Total Gestiones": 15,
+                    "Contactos Efectivos": 18,
+                    "No Contactos": 15,
+                    "Contactos No Efectivos": 20,
+                    "Gestiones PDP": 15,
+                },
+            ),
+            # Heatmap sheet - Changed name to remove invalid character
+            SheetConfig(
+                sheet_name="Mapa de Calor PDP por Hora",
                 data=heatmap_data,
-                headers=headers,
+                headers=heatmap_headers,
                 apply_filters=False,
-                heatmap_config=HeatmapConfig(value_column="promises_per_hour"),
-            )
+                heatmap_config=HeatmapConfig(value_column="pdp_per_hour"),
+            ),
         ]
 
         excel_dto = ExcelGenerationDTO(
@@ -61,52 +94,89 @@ class ExcelService:
         return str(filepath)
 
     @staticmethod
-    def _prepare_heatmap_data(
-        pdp_records: List[PDPRecord], unique_days: List[int]
-    ) -> List[Dict[str, Any]]:
-        """Prepare data for heatmap visualization"""
+    def _prepare_detailed_data(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
+        """Prepare detailed hourly data"""
+        data = []
+        for record in pdp_records:
+            data.append(
+                {
+                    "Fecha": record.record_date.strftime("%Y-%m-%d"),
+                    "Hora": f"{record.hour:02d}:00",
+                    "DNI": record.dni,
+                    "Ejecutivo": record.agent_name,
+                    "Total Gestiones": record.total_operations,
+                    "Contactos Efectivos": record.effective_contacts,
+                    "No Contactos": record.no_contacts,
+                    "Contactos No Efectivos": record.non_effective_contacts,
+                    "Gestiones PDP": record.pdp_count,
+                }
+            )
+
+        return sorted(data, key=lambda x: (x["Fecha"], x["Hora"], x["DNI"]))
+
+    @staticmethod
+    def _prepare_heatmap_data(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
+        """Prepare data for heatmap visualization - PDP per hour by day"""
 
         agent_data = {}
 
         logger.info(f"Preparing heatmap for {len(pdp_records)} records")
 
-        # Initialize agent data structure
+        # Group data by agent and day
         for record in pdp_records:
             if record.dni not in agent_data:
                 agent_data[record.dni] = {
                     "DNI": record.dni,
-                    "SUPERVISOR": record.agent_name,
-                    "days_data": {},
-                    "total": 0,
-                    "count": 0,
+                    "EJECUTIVO": record.agent_name,
+                    "total_pdp": 0,
+                    "total_distinct_hours": 0,
+                    "daily_data": {},
                 }
 
-            # Store the data for the specific day
-            day = record.record_date.day
-            agent_data[record.dni]["days_data"][day] = float(record.promises_per_hour)
-            agent_data[record.dni]["total"] += float(record.promises_per_hour)
-            agent_data[record.dni]["count"] += 1
+            day = str(record.record_date.day)
 
-        # Convert to final format
+            # Initialize daily data if not exists
+            if day not in agent_data[record.dni]["daily_data"]:
+                agent_data[record.dni]["daily_data"][day] = {
+                    "pdp_count": 0,
+                    "hours_worked": set(),  # Using set to store distinct hours
+                }
+
+            # Accumulate data
+            agent_data[record.dni]["daily_data"][day]["pdp_count"] += record.pdp_count
+            agent_data[record.dni]["daily_data"][day]["hours_worked"].add(record.hour)
+            agent_data[record.dni]["total_pdp"] += record.pdp_count
+
+        # Calculate total distinct hours for each agent
+        for dni, data in agent_data.items():
+            all_hours = set()
+            for day_data in data["daily_data"].values():
+                all_hours.update(day_data["hours_worked"])
+            data["total_distinct_hours"] = len(all_hours)
+
+        # Calculate PDP per hour for each day
         result = []
         for dni, data in agent_data.items():
-            row = {"DNI": data["DNI"], "SUPERVISOR": data["SUPERVISOR"]}
+            row = {"DNI": data["DNI"], "EJECUTIVO": data["EJECUTIVO"]}
 
-            # Add data for each day in the correct order
-            for day in unique_days:
-                day_str = str(day)
-                if day in data["days_data"]:
-                    row[day_str] = data["days_data"][day]
+            # Calculate PDP/hour for each day
+            for day, day_data in data["daily_data"].items():
+                distinct_hours = len(day_data["hours_worked"])
+                if distinct_hours > 0:
+                    pdp_per_hour = round(day_data["pdp_count"] / distinct_hours, 1)
                 else:
-                    row[day_str] = ""  # Empty cell for days without data
+                    pdp_per_hour = 0
+                row[day] = pdp_per_hour
 
-            # Calculate average
-            if data["count"] > 0:
-                row["Promedio"] = round(data["total"] / data["count"], 2)
+            # Calculate average (total PDP / total distinct hours)
+            if data["total_distinct_hours"] > 0:
+                row["Promedio"] = round(
+                    data["total_pdp"] / data["total_distinct_hours"], 1
+                )
             else:
                 row["Promedio"] = 0
 
             result.append(row)
 
-        # Sort by average (descending)
+        # Sort by average PDP/hour descending
         return sorted(result, key=lambda x: x["Promedio"], reverse=True)

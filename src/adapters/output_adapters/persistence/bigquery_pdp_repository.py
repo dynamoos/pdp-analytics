@@ -29,7 +29,7 @@ class BigQueryProductivityRepository(ProductivityRepository):
             ]
 
             rows = await self._client.execute_query(query, parameters)
-            logger.info(f"Fetched {len(rows)} call data records")
+            logger.info(f"Fetched {len(rows)} productivity records")
             return [self._map_row_to_entity(row) for row in rows]
 
         except Exception as e:
@@ -40,7 +40,12 @@ class BigQueryProductivityRepository(ProductivityRepository):
     def _map_row_to_entity(row: Dict[str, Any]) -> PDPRecord:
         return PDPRecord(
             record_date=row["fecha"],
+            hour=row["hora"],
             dni=row["dni_ejecutivo"],
             agent_name=row["ejecutivo"],
-            promises_per_hour=row["promesas_por_hora_dia"],
+            total_operations=row["total_gestiones"],
+            effective_contacts=row["contactos_efectivos"],
+            no_contacts=row["no_contactos"],
+            non_effective_contacts=row["contactos_no_efectivos"],
+            pdp_count=row["gestiones_pdp"],
         )

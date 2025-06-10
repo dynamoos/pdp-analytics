@@ -1,23 +1,35 @@
 class ExcelHeaders:
     """Excel report headers"""
 
+    # Temporal headers
     YEAR = "Año"
     MONTH = "Mes"
     DAY = "Día"
     DATE = "Fecha"
+    HOUR = "Hora"
     PERIOD = "Periodo"
+
+    # Agent headers
+    DNI = "DNI"
+    AGENT_NAME = "Ejecutivo"
+    SUPERVISOR = "Supervisor"
+    AGENT_EMAIL = "Correo Agente"
+
+    # Metrics headers
+    TOTAL_OPERATIONS = "Total Gestiones"
+    EFFECTIVE_CONTACTS = "Contactos Efectivos"
+    NO_CONTACTS = "No Contactos"
+    NON_EFFECTIVE_CONTACTS = "Contactos No Efectivos"
+    PDP_COUNT = "Gestiones PDP"
+    PDP_PER_HOUR = "PDP/Hora"
+    AVERAGE = "Promedio"
+
+    # Legacy headers
     SERVICE = "Servicio"
     PORTFOLIO = "Cartera"
     DUE_DAY = "Vencimiento"
-    DNI = "DNI"
-    SUPERVISOR = "Supervisor"
-    AGENT_NAME = "Nombre Agente"
-    AGENT_EMAIL = "Correo Agente"
-    PDP_COUNT = "Cantidad PDP"
-    TOTAL_OPERATIONS = "Total Gestiones"
     MANAGED_AMOUNT = "Monto Gestionado"
     CONNECTED_TIME = "Tiempo Conectado"
-    PDP_HOURS = "PDP/Hora"
 
 
 # Excel Configuration

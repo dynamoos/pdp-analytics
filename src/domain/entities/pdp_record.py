@@ -8,9 +8,14 @@ class PDPRecord:
     """Entity representing a PDP (Payment Promise) record"""
 
     record_date: date
+    hour: int
     dni: str
     agent_name: str
-    promises_per_hour: Decimal
+    total_operations: int
+    effective_contacts: int
+    no_contacts: int
+    non_effective_contacts: int
+    pdp_count: int
 
     def __post_init__(self):
         """Entity validations"""
@@ -20,10 +25,21 @@ class PDPRecord:
         if not self.dni:
             raise ValueError("DNI cannot be empty")
 
-        if self.promises_per_hour < 0:
-            raise ValueError("Promises per hour cannot be negative")
+        if self.hour < 0 or self.hour > 23:
+            raise ValueError("Hour must be between 0 and 23")
+
+        if self.pdp_count < 0:
+            raise ValueError("PDP count cannot be negative")
+
+        if self.total_operations < 0:
+            raise ValueError("Total operations cannot be negative")
 
     @property
     def agent_identifier(self) -> str:
         """Get agent unique identifier"""
-        return self.dni.value
+        return self.dni
+
+    @property
+    def pdp_per_hour(self) -> Decimal:
+        """Calculate PDP per hour - assuming each record represents one hour of work"""
+        return Decimal(str(self.pdp_count))

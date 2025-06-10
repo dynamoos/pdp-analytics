@@ -8,29 +8,44 @@ class PDPQueries:
 
     @staticmethod
     def get_pdps_by_filters(start_date: date, end_date: date) -> str:
-        """Get PDPs filtered by specific dates and emails"""
+        """Get PDPs filtered by specific dates"""
 
         query = """
         SELECT
-            date(fecha_hora) fecha,
-            dni_ejecutivo,
+          -- Dimensiones temporales
+          EXTRACT(DATE FROM mba.date) AS fecha,
+          EXTRACT(HOUR FROM mba.date) AS hora,
+
+          -- Información del ejecutivo
+          u.nombre_apellidos AS ejecutivo,
+          u.dni AS dni_ejecutivo,
+
+          -- Solo cantidades
+          COUNT(*) AS total_gestiones,
+          COUNTIF(h.contactabilidad = 'Contacto Efectivo') AS contactos_efectivos,
+          COUNTIF(h.contactabilidad = 'No contacto') AS no_contactos,
+          COUNTIF(h.contactabilidad = 'Contacto No Efectivo') AS contactos_no_efectivos,
+          COUNTIF(h.pdp = 'SI') AS gestiones_pdp
+
+        FROM `BI_USA.mibotair_P3fV4dWNeMkN5RJMhV8e` mba
+            INNER JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_usuarios` u
+        ON mba.correo_agente = u.usuario
+            LEFT JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_v2` h
+            ON mba.n1 = h.n_1 AND mba.n2 = h.n_2 AND mba.n3 = h.n_3
+
+        WHERE EXTRACT(DATE FROM mba.date) >= @start_date
+          AND EXTRACT(DATE FROM mba.date) <= @end_date
+
+        GROUP BY
+            fecha,
+            hora,
             ejecutivo,
-            ROUND(SUM(q_promesas) / COUNT(DISTINCT
-                                          IF(EXTRACT(HOUR from fecha_hora) < 5,
-                                             EXTRACT(HOUR from fecha_hora) + 19,
-                                             EXTRACT(HOUR from fecha_hora) - 5)
-                                    ), 2) as promesas_por_hora_dia
-        FROM mibot-222814.BI_USA.dash_P3fV4dWNeMkN5RJMhV8e_fact_gestion_horaria g
-                 LEFT JOIN mibot-222814.BI_USA.dash_P3fV4dWNeMkN5RJMhV8e_fact_asignacion a
-                           ON g.cod_luna = a.cod_luna
-        WHERE canal = 'CALL'
-          AND dni_ejecutivo != 'SIN_DNI'
-          AND date(fecha_hora) >= fecha_inicio_campana
-          AND date(fecha_hora) <= fin_campana
-          AND date(fecha_hora) >= @start_date
-          AND date(fecha_hora) <= @end_date
-        GROUP BY dni_ejecutivo, ejecutivo, date(fecha_hora)
-        ORDER BY fecha, ejecutivo
+            dni_ejecutivo
+
+        ORDER BY
+            fecha DESC,
+            hora ASC,
+            total_gestiones DESC
         """
 
         return query
