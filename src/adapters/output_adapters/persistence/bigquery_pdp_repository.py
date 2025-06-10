@@ -38,10 +38,13 @@ class BigQueryProductivityRepository(ProductivityRepository):
 
     @staticmethod
     def _map_row_to_entity(row: Dict[str, Any]) -> PDPRecord:
+        dni = (
+            str(row["dni_ejecutivo"]) if row["dni_ejecutivo"] is not None else "SIN DNI"
+        )
         return PDPRecord(
             record_date=row["fecha"],
             hour=row["hora"],
-            dni=row["dni_ejecutivo"],
+            dni=dni,
             agent_name=row["ejecutivo"],
             total_operations=row["total_gestiones"],
             effective_contacts=row["contactos_efectivos"],

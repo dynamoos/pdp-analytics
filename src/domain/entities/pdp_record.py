@@ -22,6 +22,7 @@ class PDPRecord:
         if not self.agent_name:
             raise ValueError("Agent name cannot be empty")
 
+        # Allow "SIN DNI" as a valid value
         if not self.dni:
             raise ValueError("DNI cannot be empty")
 

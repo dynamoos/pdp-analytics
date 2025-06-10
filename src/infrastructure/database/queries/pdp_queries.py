@@ -17,8 +17,8 @@ class PDPQueries:
           EXTRACT(HOUR FROM mba.date) AS hora,
 
           -- Información del ejecutivo
-          u.nombre_apellidos AS ejecutivo,
-          u.dni AS dni_ejecutivo,
+          COALESCE(u.nombre_apellidos, mba.nombre_agente, 'SIN NOMBRE') AS ejecutivo,
+          COALESCE(CAST(u.dni AS STRING), 'SIN DNI') AS dni_ejecutivo,
 
           -- Solo cantidades
           COUNT(*) AS total_gestiones,
@@ -33,8 +33,10 @@ class PDPQueries:
             LEFT JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_v2` h
             ON mba.n1 = h.n_1 AND mba.n2 = h.n_2 AND mba.n3 = h.n_3
 
-        WHERE EXTRACT(DATE FROM mba.date) >= @start_date
-          AND EXTRACT(DATE FROM mba.date) <= @end_date
+        WHERE COALESCE(u.nombre_apellidos, mba.nombre_agente, 'SIN NOMBRE') != ''
+            AND COALESCE(u.nombre_apellidos, mba.nombre_agente, 'SIN NOMBRE') != 'SIN NOMBRE'
+            AND EXTRACT(DATE FROM mba.date) >= @start_date
+            AND EXTRACT(DATE FROM mba.date) <= @end_date
 
         GROUP BY
             fecha,
