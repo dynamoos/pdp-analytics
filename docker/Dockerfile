@@ -1,60 +1,32 @@
-# Build stage
-FROM python:3.11-slim as builder
-
-# Install uv
-RUN pip install uv
-
-# Set working directory
-WORKDIR /app
-
-# Copy dependency files from parent directory
-COPY pyproject.toml uv.lock* requirements.txt* ./
-
-# Create virtual environment and install dependencies
-RUN uv venv && \
-    . .venv/bin/activate && \
-    uv pip install --no-cache -r requirements.txt || \
-    uv pip install --no-cache -r pyproject.toml
-
-# Runtime stage
+# Usar imagen base de Python 3.11 slim
 FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+# Instalar dependencias del sistema necesarias
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser
-
-# Set working directory
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Copy virtual environment from builder
-COPY --from=builder /app/.venv /app/.venv
+# Copiar archivos de requerimientos
+COPY requirements.txt* pyproject.toml* ./
 
-# Copy application code
-COPY src/ ./src/
+# Instalar dependencias
+RUN pip install -r requirements.txt
 
-# Create necessary directories
-RUN mkdir -p logs output templates && \
-    chown -R appuser:appuser /app
+# Copiar el resto del código
+COPY . .
 
-# Switch to non-root user
-USER appuser
+# Crear directorios necesarios
+RUN mkdir -p logs output templates
 
-# Set environment variables
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH=/app \
-    PYTHONUNBUFFERED=1 \
-    UV_SYSTEM_PYTHON=1
+# Exponer puerto
+EXPOSE 9004
 
-# Expose port
-EXPOSE 8000
+# Variables de entorno por defecto
+ENV PYTHONUNBUFFERED=1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
-CMD ["python", "-m", "src.adapters.input_adapters.api.main"]
+# Comando para ejecutar la aplicación
+CMD ["python", "-m", "uvicorn", "src.adapters.input_adapters.api.main:app", "--host", "0.0.0.0", "--port", "9004"]

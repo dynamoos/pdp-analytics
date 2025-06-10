@@ -26,7 +26,7 @@ async def detailed_health_check(bigquery_client: BigQueryClient):
     health_status = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "dependencies": {"bigquery": "unknown", "postgres": "unknown"},
+        "dependencies": {"bigquery": "unknown"},
     }
 
     # Check BigQuery
