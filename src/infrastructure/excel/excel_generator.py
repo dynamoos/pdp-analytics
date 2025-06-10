@@ -92,7 +92,7 @@ class ExcelGenerator:
                 "border_color": "#D3D3D3",
                 "align": "center",
                 "valign": "vcenter",
-                "num_format": "0.00",
+                "num_format": "0.0",
             }
         )
         format_yellow = workbook.add_format(
@@ -102,7 +102,7 @@ class ExcelGenerator:
                 "border_color": "#D3D3D3",
                 "align": "center",
                 "valign": "vcenter",
-                "num_format": "0.00",
+                "num_format": "0.0",
             }
         )
         format_green = workbook.add_format(
@@ -112,7 +112,7 @@ class ExcelGenerator:
                 "border_color": "#D3D3D3",
                 "align": "center",
                 "valign": "vcenter",
-                "num_format": "0.00",
+                "num_format": "0.0",
             }
         )
         format_white = workbook.add_format(
@@ -167,7 +167,9 @@ class ExcelGenerator:
                 cell_value = df.iloc[row_idx][col]
 
                 # Handle empty, NaN, or empty string
-                if pd.isna(cell_value) or cell_value == "" or cell_value is None:
+                if cell_value == "" or cell_value is None:
+                    worksheet.write(row_idx + 1, col_idx, "", format_white)
+                elif pd.isna(cell_value):
                     worksheet.write(row_idx + 1, col_idx, "", format_white)
                 else:
                     try:
@@ -176,10 +178,8 @@ class ExcelGenerator:
                             worksheet.write(row_idx + 1, col_idx, value, format_green)
                         elif value >= 2:
                             worksheet.write(row_idx + 1, col_idx, value, format_yellow)
-                        elif value > 0:
-                            worksheet.write(row_idx + 1, col_idx, value, format_red)
                         else:
-                            worksheet.write(row_idx + 1, col_idx, "", format_white)
+                            worksheet.write(row_idx + 1, col_idx, value, format_red)
                     except (ValueError, TypeError):
                         worksheet.write(row_idx + 1, col_idx, "", format_white)
 

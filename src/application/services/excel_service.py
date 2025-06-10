@@ -171,7 +171,7 @@ class ExcelService:
                     day_data = data["daily_data"][day]
                     distinct_hours = len(day_data["hours_worked"])
                     if distinct_hours > 0:
-                        pdp_per_hour = round(day_data["pdp_count"] / distinct_hours, 2)
+                        pdp_per_hour = round(day_data["pdp_count"] / distinct_hours, 1)
                     else:
                         pdp_per_hour = 0
 
@@ -187,7 +187,7 @@ class ExcelService:
             # Calculate average as the mean of daily PDP/hour values - ADD AT THE END
             if daily_pdp_per_hour_values:
                 row["Promedio"] = round(
-                    sum(daily_pdp_per_hour_values) / len(daily_pdp_per_hour_values), 2
+                    sum(daily_pdp_per_hour_values) / len(daily_pdp_per_hour_values), 1
                 )
             else:
                 row["Promedio"] = 0
