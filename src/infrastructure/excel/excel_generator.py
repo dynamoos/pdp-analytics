@@ -46,12 +46,21 @@ class ExcelGenerator:
 
         # Ensure columns are in the correct order based on headers
         if sheet_config.headers:
-            # Reorder columns to match headers
+            # Create ordered columns list
             ordered_columns = []
+
+            # First add columns that exist in headers in the exact order
             for header in sheet_config.headers:
                 if header in df.columns:
                     ordered_columns.append(header)
 
+            # If we have a different number of columns, it means some are missing
+            # Add any remaining columns that aren't in headers (shouldn't happen)
+            for col in df.columns:
+                if col not in ordered_columns:
+                    ordered_columns.append(col)
+
+            # Reorder dataframe columns
             df = df[ordered_columns]
 
         df.to_excel(writer, sheet_name=sheet_config.sheet_name, index=False)
@@ -133,7 +142,7 @@ class ExcelGenerator:
         for col_idx in range(len(df.columns)):
             worksheet.write(0, col_idx, df.columns[col_idx], header_format)
 
-        # Find numeric columns (days)
+        # Find numeric columns (days) and Promedio
         day_columns = []
         for col in df.columns:
             if col.isdigit() and 1 <= int(col) <= 31:
@@ -141,15 +150,19 @@ class ExcelGenerator:
 
         # Apply conditional formatting to each cell
         for row_idx in range(len(df)):
-            # Format DNI and SUPERVISOR columns
+            # Format DNI and EJECUTIVO columns
             for col_idx, col in enumerate(df.columns):
-                if col in ["DNI", "SUPERVISOR"]:
+                if col in ["DNI", "EJECUTIVO"]:
                     worksheet.write(
                         row_idx + 1, col_idx, df.iloc[row_idx][col], format_white
                     )
 
-            # Format day columns
-            for col in day_columns:
+            # Format day columns AND Promedio column with the same heatmap logic
+            columns_to_format = day_columns + (
+                ["Promedio"] if "Promedio" in df.columns else []
+            )
+
+            for col in columns_to_format:
                 col_idx = df.columns.get_loc(col)
                 cell_value = df.iloc[row_idx][col]
 
@@ -170,36 +183,16 @@ class ExcelGenerator:
                     except (ValueError, TypeError):
                         worksheet.write(row_idx + 1, col_idx, "", format_white)
 
-        # Format para la columna Promedio (con fondo azul claro)
-        format_average = workbook.add_format(
-            {
-                "bg_color": "#DCE6F1",
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-                "num_format": "0.00",
-                "bold": True,
-            }
-        )
-
-        # Aplicar formato a la columna Promedio
-        if "Promedio" in df.columns:
-            avg_idx = df.columns.get_loc("Promedio")
-            for row_idx in range(len(df)):
-                value = df.iloc[row_idx]["Promedio"]
-                worksheet.write(row_idx + 1, avg_idx, value, format_average)
-
         # Set column widths
         worksheet.set_column(0, 0, 12)  # DNI
-        worksheet.set_column(1, 1, 40)  # SUPERVISOR
+        worksheet.set_column(1, 1, 40)  # EJECUTIVO
 
         # Day columns
         for col in day_columns:
             col_idx = df.columns.get_loc(col)
             worksheet.set_column(col_idx, col_idx, 6)
 
-        # Promedio column
+        # Promedio column - same width as days
         if "Promedio" in df.columns:
             avg_idx = df.columns.get_loc("Promedio")
             worksheet.set_column(avg_idx, avg_idx, 12)

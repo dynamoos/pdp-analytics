@@ -39,6 +39,15 @@ class ProcessPDPDataUseCase:
             records = await self._productivity_repository.get_by_filters(
                 start_date, end_date
             )
+            sin_dni_count = sum(1 for r in records if r.dni == "SIN DNI")
+            logger.info(
+                f"Found {len(records)} productivity records, including {sin_dni_count} with SIN DNI"
+            )
+
+            # Log a sample of SIN DNI records
+            sin_dni_records = [r for r in records if r.dni == "SIN DNI"]
+            if sin_dni_records:
+                logger.debug(f"Sample SIN DNI record: {sin_dni_records[0]}")
             if not records:
                 logger.warning("No productivity data found")
                 processing_time = time.time() - start_time

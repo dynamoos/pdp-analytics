@@ -28,10 +28,10 @@ class PDPQueries:
           COUNTIF(h.pdp = 'SI') AS gestiones_pdp
 
         FROM `BI_USA.mibotair_P3fV4dWNeMkN5RJMhV8e` mba
-            INNER JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_usuarios` u
-        ON mba.correo_agente = u.usuario
+            LEFT JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_usuarios` u
+                ON mba.correo_agente = u.usuario
             LEFT JOIN `BI_USA.homologacion_P3fV4dWNeMkN5RJMhV8e_v2` h
-            ON mba.n1 = h.n_1 AND mba.n2 = h.n_2 AND mba.n3 = h.n_3
+                ON mba.n1 = h.n_1 AND mba.n2 = h.n_2 AND mba.n3 = h.n_3
 
         WHERE COALESCE(u.nombre_apellidos, mba.nombre_agente, 'SIN NOMBRE') != ''
             AND COALESCE(u.nombre_apellidos, mba.nombre_agente, 'SIN NOMBRE') != 'SIN NOMBRE'
@@ -45,7 +45,7 @@ class PDPQueries:
             dni_ejecutivo
 
         ORDER BY
-            fecha DESC,
+            fecha ASC,
             hora ASC,
             total_gestiones DESC
         """

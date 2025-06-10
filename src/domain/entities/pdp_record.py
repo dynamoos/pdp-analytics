@@ -22,10 +22,6 @@ class PDPRecord:
         if not self.agent_name:
             raise ValueError("Agent name cannot be empty")
 
-        # Allow "SIN DNI" as a valid value
-        if not self.dni:
-            raise ValueError("DNI cannot be empty")
-
         if self.hour < 0 or self.hour > 23:
             raise ValueError("Hour must be between 0 and 23")
 
