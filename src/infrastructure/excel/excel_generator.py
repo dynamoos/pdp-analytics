@@ -8,18 +8,15 @@ class ExcelGenerator:
     """Excel file generator with formatting and heatmap capabilities"""
 
     def generate(self, excel_dto: ExcelGenerationDTO) -> None:
-        """Generate Excel file with multiple sheets and formatting"""
         try:
             logger.info(f"Generating Excel file: {excel_dto.output_filename}")
 
-            # Create workbook
             with pd.ExcelWriter(
                 excel_dto.output_filename, engine="xlsxwriter"
             ) as writer:
                 for sheet_config in excel_dto.sheet_configs:
                     self._create_sheet(writer, sheet_config)
 
-                # Get workbook and apply additional formatting
                 workbook = writer.book
 
                 for sheet_config in excel_dto.sheet_configs:
@@ -41,31 +38,23 @@ class ExcelGenerator:
 
     @staticmethod
     def _create_sheet(writer: pd.ExcelWriter, sheet_config: SheetConfig) -> None:
-        """Create a sheet with data"""
         df = pd.DataFrame(sheet_config.data)
 
-        # Ensure columns are in the correct order based on headers
         if sheet_config.headers:
-            # Create ordered columns list
             ordered_columns = []
 
-            # First add columns that exist in headers in the exact order
             for header in sheet_config.headers:
                 if header in df.columns:
                     ordered_columns.append(header)
 
-            # If we have a different number of columns, it means some are missing
-            # Add any remaining columns that aren't in headers (shouldn't happen)
             for col in df.columns:
                 if col not in ordered_columns:
                     ordered_columns.append(col)
 
-            # Reorder dataframe columns
             df = df[ordered_columns]
 
         df.to_excel(writer, sheet_name=sheet_config.sheet_name, index=False)
 
-        # Apply column widths if specified
         if sheet_config.column_widths:
             worksheet = writer.sheets[sheet_config.sheet_name]
             for col, width in sheet_config.column_widths.items():
@@ -75,7 +64,6 @@ class ExcelGenerator:
 
     @staticmethod
     def _apply_filters(worksheet, sheet_config: SheetConfig) -> None:
-        """Apply filters to the worksheet"""
         df = pd.DataFrame(sheet_config.data)
         worksheet.autofilter(0, 0, len(df), len(df.columns) - 1)
 
@@ -84,118 +72,118 @@ class ExcelGenerator:
         """Apply heatmap formatting to numeric columns"""
         df = pd.DataFrame(sheet_config.data)
 
-        # Define formats for the heatmap with borders
-        format_red = workbook.add_format(
-            {
-                "bg_color": "#F8696B",
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-                "num_format": "0.0",
-            }
-        )
-        format_yellow = workbook.add_format(
-            {
-                "bg_color": "#FFEB84",
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-                "num_format": "0.0",
-            }
-        )
-        format_green = workbook.add_format(
-            {
-                "bg_color": "#63BE7B",
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-                "num_format": "0.0",
-            }
-        )
-        format_white = workbook.add_format(
-            {
-                "bg_color": "#FFFFFF",
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-            }
-        )
+        # Obtener la configuración del heatmap
+        config = sheet_config.heatmap_config
 
-        # Header format
-        header_format = workbook.add_format(
-            {
-                "bg_color": "#366092",
-                "font_color": "#FFFFFF",
-                "bold": True,
-                "border": 1,
-                "border_color": "#D3D3D3",
-                "align": "center",
-                "valign": "vcenter",
-            }
-        )
+        # Crear formato base común usando la configuración
+        base_format = {
+            "align": "center",
+            "valign": "vcenter",
+        }
 
-        # Apply header format
-        for col_idx in range(len(df.columns)):
-            worksheet.write(0, col_idx, df.columns[col_idx], header_format)
-
-        # Find numeric columns (days) and Promedio
-        day_columns = []
-        for col in df.columns:
-            if col.isdigit() and 1 <= int(col) <= 31:
-                day_columns.append(col)
-
-        # Apply conditional formatting to each cell
-        for row_idx in range(len(df)):
-            # Format DNI and EJECUTIVO columns
-            for col_idx, col in enumerate(df.columns):
-                if col in ["DNI", "EJECUTIVO"]:
-                    worksheet.write(
-                        row_idx + 1, col_idx, df.iloc[row_idx][col], format_white
-                    )
-
-            # Format day columns AND Promedio column with the same heatmap logic
-            columns_to_format = day_columns + (
-                ["Promedio"] if "Promedio" in df.columns else []
+        # Agregar bordes si está configurado
+        if config.include_borders:
+            base_format.update(
+                {
+                    "border": 1,
+                    "border_color": "#D3D3D3",
+                }
             )
 
-            for col in columns_to_format:
-                col_idx = df.columns.get_loc(col)
-                cell_value = df.iloc[row_idx][col]
+        # Definir formatos usando los colores de la configuración
+        formats = {
+            "high": workbook.add_format(
+                {
+                    **base_format,
+                    "bg_color": config.min_color,  # Verde para valores altos (buenos)
+                    "num_format": "0.0",
+                }
+            ),
+            "medium": workbook.add_format(
+                {
+                    **base_format,
+                    "bg_color": config.mid_color,  # Amarillo para valores medios
+                    "num_format": "0.0",
+                }
+            ),
+            "low": workbook.add_format(
+                {
+                    **base_format,
+                    "bg_color": config.max_color,  # Rojo para valores bajos
+                    "num_format": "0.0",
+                }
+            ),
+            "null": workbook.add_format(
+                {
+                    **base_format,
+                    "bg_color": config.null_color,  # Blanco para vacíos
+                }
+            ),
+            "header": workbook.add_format(
+                {
+                    **base_format,
+                    "bg_color": config.header_color,
+                    "font_color": "#FFFFFF",
+                    "bold": True,
+                }
+            ),
+        }
 
-                # Handle empty, NaN, or empty string
-                if cell_value == "" or cell_value is None:
-                    worksheet.write(row_idx + 1, col_idx, "", format_white)
-                elif pd.isna(cell_value):
-                    worksheet.write(row_idx + 1, col_idx, "", format_white)
-                else:
-                    try:
-                        value = float(cell_value)
-                        if value >= 3:
-                            worksheet.write(row_idx + 1, col_idx, value, format_green)
-                        elif value >= 2:
-                            worksheet.write(row_idx + 1, col_idx, value, format_yellow)
-                        else:
-                            worksheet.write(row_idx + 1, col_idx, value, format_red)
-                    except (ValueError, TypeError):
-                        worksheet.write(row_idx + 1, col_idx, "", format_white)
+        # Aplicar formato a headers
+        for col_idx, col_name in enumerate(df.columns):
+            worksheet.write(0, col_idx, col_name, formats["header"])
 
-        # Set column widths
+        # Identificar columnas de días
+        day_columns = [
+            col for col in df.columns if col.isdigit() and 1 <= int(col) <= 31
+        ]
+
+        # Identificar columnas a formatear con heatmap
+        heatmap_columns = set(day_columns)
+        if "Promedio" in df.columns:
+            heatmap_columns.add("Promedio")
+
+        # Aplicar formato a celdas
+        for row_idx in range(len(df)):
+            for col_idx, col in enumerate(df.columns):
+                cell_value = df.iloc[row_idx, col_idx]
+                excel_row = row_idx + 1
+
+                # Columnas de texto (DNI, EJECUTIVO)
+                if col in ["DNI", "EJECUTIVO"]:
+                    worksheet.write(excel_row, col_idx, cell_value, formats["null"])
+
+                # Columnas numéricas con heatmap
+                elif col in heatmap_columns:
+                    # Determinar formato basado en valor
+                    if cell_value == "" or cell_value is None or pd.isna(cell_value):
+                        worksheet.write(excel_row, col_idx, "", formats["null"])
+                    else:
+                        try:
+                            value = float(cell_value)
+                            if value >= 3:
+                                cell_format = formats["high"]
+                            elif value >= 2:
+                                cell_format = formats["medium"]
+                            else:
+                                cell_format = formats["low"]
+                            worksheet.write(excel_row, col_idx, value, cell_format)
+                        except (ValueError, TypeError):
+                            worksheet.write(excel_row, col_idx, "", formats["null"])
+
+        # Configurar anchos de columna
         worksheet.set_column(0, 0, 12)  # DNI
         worksheet.set_column(1, 1, 40)  # EJECUTIVO
 
-        # Day columns
+        # Días - ancho uniforme
         for col in day_columns:
             col_idx = df.columns.get_loc(col)
             worksheet.set_column(col_idx, col_idx, 6)
 
-        # Promedio column - same width as days
+        # Promedio
         if "Promedio" in df.columns:
             avg_idx = df.columns.get_loc("Promedio")
             worksheet.set_column(avg_idx, avg_idx, 12)
 
-        # Freeze panes (optional - keeps headers visible when scrolling)
-        worksheet.freeze_panes(1, 2)  # Freeze first row and first two columns
+        # Congelar paneles
+        worksheet.freeze_panes(1, 2)

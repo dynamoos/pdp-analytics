@@ -10,6 +10,8 @@ class HeatmapConfig:
     min_color: str = "#63BE7B"
     mid_color: str = "#FFEB84"
     max_color: str = "#F8696B"
+    null_color: str = "#FFFFFF"
+    header_color: str = "#366092"
     include_borders: bool = True
 
 

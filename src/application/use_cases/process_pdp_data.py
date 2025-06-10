@@ -54,17 +54,7 @@ class ProcessPDPDataUseCase:
             excel_path = await self._excel_service.generate_pdp_report(records)
 
             # Calculate statistics
-            unique_agents = len(set(record.dni for record in records))
-
-            # Calculate total PDP and distinct hours for average
-            agent_hours = {}
-            total_pdp = 0
-
-            for record in records:
-                if record.dni not in agent_hours:
-                    agent_hours[record.dni] = set()
-                agent_hours[record.dni].add(record.hour)
-                total_pdp += record.pdp_count
+            unique_agents = len(set(record.agent_name for record in records))
 
             processing_time = time.time() - start_time
 

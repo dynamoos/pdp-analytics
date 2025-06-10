@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.application.dto import ExcelGenerationDTO, HeatmapConfig, SheetConfig
 from src.domain.entities import PDPRecord
-from src.infrastructure.excel.excel_generator import ExcelGenerator
+from src.infrastructure.excel import ExcelGenerator
 from src.shared.constants import EXCEL_OUTPUT_PATH
 
 
@@ -37,8 +37,7 @@ class ExcelService:
         filepath = self._output_path / filename
 
         # Get unique days from data and sort them numerically
-        unique_days = sorted(set(record.record_date.day for record in pdp_records))
-        day_columns = [str(day) for day in unique_days]
+        day_columns = sorted({str(record.record_date.day) for record in pdp_records})
 
         # Headers for detailed sheet
         detailed_headers = [
@@ -96,21 +95,20 @@ class ExcelService:
     @staticmethod
     def _prepare_detailed_data(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
         """Prepare detailed hourly data"""
-        data = []
-        for record in pdp_records:
-            data.append(
-                {
-                    "Fecha": record.record_date.strftime("%Y-%m-%d"),
-                    "Hora": f"{record.hour:02d}:00",
-                    "DNI": record.dni,
-                    "Ejecutivo": record.agent_name,
-                    "Total Gestiones": record.total_operations,
-                    "Contactos Efectivos": record.effective_contacts,
-                    "No Contactos": record.no_contacts,
-                    "Contactos No Efectivos": record.non_effective_contacts,
-                    "Gestiones PDP": record.pdp_count,
-                }
-            )
+        data = [
+            {
+                "Fecha": record.record_date.strftime("%Y-%m-%d"),
+                "Hora": f"{record.hour:02d}:00",
+                "DNI": record.dni,
+                "Ejecutivo": record.agent_name,
+                "Total Gestiones": record.total_operations,
+                "Contactos Efectivos": record.effective_contacts,
+                "No Contactos": record.no_contacts,
+                "Contactos No Efectivos": record.non_effective_contacts,
+                "Gestiones PDP": record.pdp_count,
+            }
+            for record in pdp_records
+        ]
 
         return sorted(data, key=lambda x: (x["Fecha"], x["Hora"], x["DNI"]))
 
@@ -118,80 +116,48 @@ class ExcelService:
     def _prepare_heatmap_data(pdp_records: List[PDPRecord]) -> List[Dict[str, Any]]:
         """Prepare data for heatmap visualization - PDP per hour by day"""
 
-        agent_data = {}
+        if not pdp_records:
+            return []
 
-        # First, get all unique days across all records
-        all_days = sorted(set(record.record_date.day for record in pdp_records))
+        from collections import defaultdict
 
-        logger.info(f"Preparing heatmap for {len(pdp_records)} records")
+        all_days = sorted(set(r.record_date.day for r in pdp_records))
 
-        # Group data by agent - use a combination of DNI and agent name for uniqueness
-        for record in pdp_records:
-            # Create a unique key for each agent
-            # If DNI is "SIN DNI", use agent name as part of the key
-            if record.dni == "SIN DNI":
-                agent_key = f"SIN_DNI_{record.agent_name}"
-            else:
-                agent_key = record.dni
-
-            if agent_key not in agent_data:
-                agent_data[agent_key] = {
-                    "DNI": record.dni,
-                    "EJECUTIVO": record.agent_name,
-                    "daily_data": {},
+        agents = {}
+        for r in pdp_records:
+            key = r.dni if r.dni != "SIN DNI" else f"SIN_DNI_{r.agent_name}"
+            if key not in agents:
+                agents[key] = {
+                    "info": {"DNI": r.dni, "EJECUTIVO": r.agent_name},
+                    "days": defaultdict(lambda: {"pdp": 0, "hours": set()}),
                 }
+            agents[key]["days"][r.record_date.day]["pdp"] += r.pdp_count
+            agents[key]["days"][r.record_date.day]["hours"].add(r.hour)
 
-            day = record.record_date.day
-
-            # Initialize daily data if not exists
-            if day not in agent_data[agent_key]["daily_data"]:
-                agent_data[agent_key]["daily_data"][day] = {
-                    "pdp_count": 0,
-                    "hours_worked": set(),  # Using set to store distinct hours
-                }
-
-            # Accumulate data
-            agent_data[agent_key]["daily_data"][day]["pdp_count"] += record.pdp_count
-            agent_data[agent_key]["daily_data"][day]["hours_worked"].add(record.hour)
-
-        # Calculate PDP per hour for each day
         result = []
-        for agent_key, data in agent_data.items():
-            # Start with DNI and EJECUTIVO
-            row = {"DNI": data["DNI"], "EJECUTIVO": data["EJECUTIVO"]}
+        for agent_data in agents.values():
+            row = {
+                "DNI": agent_data["info"]["DNI"],
+                "EJECUTIVO": agent_data["info"]["EJECUTIVO"],
+            }
+            pdp_rates = []
 
-            # List to store daily PDP/hour values for average calculation
-            daily_pdp_per_hour_values = []
-
-            # Add all days in order
             for day in all_days:
-                day_str = str(day)
-
-                if day in data["daily_data"]:
-                    day_data = data["daily_data"][day]
-                    distinct_hours = len(day_data["hours_worked"])
-                    if distinct_hours > 0:
-                        pdp_per_hour = round(day_data["pdp_count"] / distinct_hours, 1)
-                    else:
-                        pdp_per_hour = 0
-
-                    # Add to list for average calculation (only if > 0)
-                    if pdp_per_hour > 0:
-                        daily_pdp_per_hour_values.append(pdp_per_hour)
+                if day in agent_data["days"]:
+                    hours_count = len(agent_data["days"][day]["hours"])
+                    rate = (
+                        round(agent_data["days"][day]["pdp"] / hours_count, 1)
+                        if hours_count
+                        else 0
+                    )
+                    if rate > 0:
+                        pdp_rates.append(rate)
+                    row[str(day)] = rate
                 else:
-                    # If no data for this day, leave empty
-                    pdp_per_hour = ""
+                    row[str(day)] = ""
 
-                row[day_str] = pdp_per_hour
+            from statistics import mean
 
-            # Calculate average as the mean of daily PDP/hour values - ADD AT THE END
-            if daily_pdp_per_hour_values:
-                row["Promedio"] = round(
-                    sum(daily_pdp_per_hour_values) / len(daily_pdp_per_hour_values), 1
-                )
-            else:
-                row["Promedio"] = 0
-
+            row["Promedio"] = round(mean(pdp_rates), 1) if pdp_rates else 0
             result.append(row)
-
         return sorted(result, key=lambda x: x["Promedio"], reverse=True)
