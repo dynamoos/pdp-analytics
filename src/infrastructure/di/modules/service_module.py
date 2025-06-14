@@ -1,7 +1,8 @@
 from dependency_injector import containers, providers
 
-from src.application.services.excel_service import ExcelService
-from src.infrastructure.excel.excel_generator import ExcelGenerator
+from src.adapters.output_adapters.services import PandasTransformationService
+from src.application.services import ExcelService
+from src.infrastructure.excel import ExcelGenerator
 from src.shared.constants import EXCEL_OUTPUT_PATH
 
 
@@ -9,6 +10,8 @@ class ServiceModule(containers.DeclarativeContainer):
     """Application services module"""
 
     config = providers.Configuration()
+
+    data_transformation_service = providers.Singleton(PandasTransformationService)
 
     excel_generator = providers.Singleton(ExcelGenerator)
 

@@ -1,6 +1,6 @@
 from dependency_injector import containers, providers
 
-from src.application.use_cases.process_pdp_data import ProcessPDPDataUseCase
+from src.application.use_cases import ProcessPDPDataUseCase
 
 
 class UseCaseModule(containers.DeclarativeContainer):
@@ -14,4 +14,5 @@ class UseCaseModule(containers.DeclarativeContainer):
         ProcessPDPDataUseCase,
         productivity_repository=repositories.productivity_repository,
         excel_service=services.excel_service,
+        data_transformation_service=services.data_transformation_service,
     )

@@ -1,8 +1,6 @@
 from dependency_injector import containers, providers
 
-from src.adapters.output_adapters.persistence.bigquery_pdp_repository import (
-    BigQueryProductivityRepository,
-)
+from src.adapters.output_adapters.persistence import BigQueryProductivityRepository
 
 
 class RepositoryModule(containers.DeclarativeContainer):

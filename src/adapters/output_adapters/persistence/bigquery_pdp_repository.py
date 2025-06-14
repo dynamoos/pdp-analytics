@@ -4,10 +4,10 @@ from typing import Any, Dict, List
 from google.cloud.bigquery.query import ScalarQueryParameter
 from loguru import logger
 
-from src.domain.entities.pdp_record import PDPRecord
-from src.domain.repositories.productivity_repository import ProductivityRepository
-from src.infrastructure.database.bigquery_client import BigQueryClient
-from src.infrastructure.database.queries.pdp_queries import PDPQueries
+from src.application.ports.repositories import ProductivityRepository
+from src.domain.entities import PDPRecord
+from src.infrastructure.database import BigQueryClient
+from src.infrastructure.database.queries import PDPQueries
 from src.shared.exceptions import RepositoryException
 
 

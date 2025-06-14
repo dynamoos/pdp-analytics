@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from google.cloud import bigquery
 from google.cloud.bigquery import ArrayQueryParameter, ScalarQueryParameter
@@ -15,7 +15,7 @@ class BigQueryClient:
     def __init__(
         self,
         project_id: str,
-        credentials_path: Optional[str] = None,
+        credentials_path: str | None = None,
         location: str = None,
     ):
         self._project_id = project_id
@@ -38,10 +38,8 @@ class BigQueryClient:
     async def execute_query(
         self,
         query: str,
-        parameters: Optional[
-            List[Union[ScalarQueryParameter, ArrayQueryParameter]]
-        ] = None,
-    ) -> List[Dict[str, Any]]:
+        parameters: list[ScalarQueryParameter | ArrayQueryParameter] | None = None,
+    ) -> list[dict[str, Any]]:
         try:
             logger.debug(f"Executing query: {query[:50]}...")
 

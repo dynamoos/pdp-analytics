@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,11 +20,9 @@ class SheetConfig:
     """Configuration for each Excel sheet"""
 
     sheet_name: str
-    data: List[Dict[str, Any]]
-    headers: List[str]
-    column_widths: Dict[str, int] = None
+    data: list[dict[str, Any]]
     apply_filters: bool = True
-    heatmap_config: Optional["HeatmapConfig"] = None
+    heatmap_ranges: dict[str, float] | None = None
 
 
 @dataclass
@@ -32,4 +30,4 @@ class ExcelGenerationDTO:
     """DTO for Excel generation parameters"""
 
     output_filename: str
-    sheet_configs: List["SheetConfig"]
+    sheet_configs: list[SheetConfig]

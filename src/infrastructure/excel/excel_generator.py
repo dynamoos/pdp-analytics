@@ -8,25 +8,15 @@ class ExcelGenerator:
     """Excel file generator with formatting and heatmap capabilities"""
 
     def generate(self, excel_dto: ExcelGenerationDTO) -> None:
+        """Generate Excel file from DTO configuration."""
         try:
             logger.info(f"Generating Excel file: {excel_dto.output_filename}")
 
             with pd.ExcelWriter(
                 excel_dto.output_filename, engine="xlsxwriter"
             ) as writer:
-                for sheet_config in excel_dto.sheet_configs:
-                    self._create_sheet(writer, sheet_config)
-
-                workbook = writer.book
-
-                for sheet_config in excel_dto.sheet_configs:
-                    worksheet = writer.sheets[sheet_config.sheet_name]
-
-                    if sheet_config.apply_filters:
-                        self._apply_filters(worksheet, sheet_config)
-
-                    if sheet_config.heatmap_config:
-                        self._apply_heatmap(workbook, worksheet, sheet_config)
+                self._create_all_sheets(writer, excel_dto.sheet_configs)
+                self._apply_sheet_formatting(writer, excel_dto.sheet_configs)
 
             logger.info(
                 f"Excel file generated successfully: {excel_dto.output_filename}"
@@ -37,153 +27,174 @@ class ExcelGenerator:
             raise
 
     @staticmethod
-    def _create_sheet(writer: pd.ExcelWriter, sheet_config: SheetConfig) -> None:
-        df = pd.DataFrame(sheet_config.data)
+    def _create_all_sheets(
+        writer: pd.ExcelWriter, sheet_configs: list[SheetConfig]
+    ) -> None:
+        """Create all Excel sheets with data."""
+        for config in sheet_configs:
+            df = pd.DataFrame(config.data)
+            df.to_excel(writer, sheet_name=config.sheet_name, index=False)
 
-        if sheet_config.headers:
-            ordered_columns = []
+    def _apply_sheet_formatting(
+        self, writer: pd.ExcelWriter, sheet_configs: list[SheetConfig]
+    ) -> None:
+        """Apply formatting to all sheets."""
+        workbook = writer.book
 
-            for header in sheet_config.headers:
-                if header in df.columns:
-                    ordered_columns.append(header)
+        for config in sheet_configs:
+            worksheet = writer.sheets[config.sheet_name]
 
-            for col in df.columns:
-                if col not in ordered_columns:
-                    ordered_columns.append(col)
+            if config.apply_filters:
+                self._apply_filters(worksheet, config)
 
-            df = df[ordered_columns]
+            if config.heatmap_ranges:
+                formatter = HeatmapFormatter(workbook, worksheet, config)
+                formatter.apply()
 
-        df.to_excel(writer, sheet_name=sheet_config.sheet_name, index=False)
-
-        if sheet_config.column_widths:
-            worksheet = writer.sheets[sheet_config.sheet_name]
-            for col, width in sheet_config.column_widths.items():
-                col_idx = df.columns.get_loc(col) if col in df.columns else None
-                if col_idx is not None:
-                    worksheet.set_column(col_idx, col_idx, width)
+            self._auto_fit_columns(worksheet, config)
 
     @staticmethod
     def _apply_filters(worksheet, sheet_config: SheetConfig) -> None:
+        """Apply autofilters to worksheet."""
         df = pd.DataFrame(sheet_config.data)
-        worksheet.autofilter(0, 0, len(df), len(df.columns) - 1)
+        if not df.empty:
+            worksheet.autofilter(0, 0, len(df), len(df.columns) - 1)
 
     @staticmethod
-    def _apply_heatmap(workbook, worksheet, sheet_config: SheetConfig) -> None:
-        """Apply heatmap formatting to numeric columns"""
+    def _auto_fit_columns(worksheet, sheet_config: SheetConfig) -> None:
+        """Auto-fit all columns based on content."""
         df = pd.DataFrame(sheet_config.data)
 
-        # Obtener la configuración del heatmap
-        config = sheet_config.heatmap_config
+        for col_idx, col_name in enumerate(df.columns):
+            max_length = len(str(col_name))
 
-        # Crear formato base común usando la configuración
+            if not df.empty:
+                content_max = df[col_name].astype(str).str.len().max()
+                max_length = max(max_length, content_max)
+
+            adjusted_width = min(max_length * 1.1 + 2, 50)
+            adjusted_width = max(adjusted_width, 8)
+
+            worksheet.set_column(col_idx, col_idx, adjusted_width)
+
+
+class HeatmapFormatter:
+    """Handles heatmap formatting for Excel worksheets."""
+
+    def __init__(self, workbook, worksheet, sheet_config: SheetConfig):
+        self.workbook = workbook
+        self.worksheet = worksheet
+        self.config = sheet_config
+        self.df = pd.DataFrame(sheet_config.data)
+        self.formats = self._create_formats()
+
+    def apply(self) -> None:
+        """Apply heatmap formatting to worksheet."""
+        self._format_headers()
+        self._format_data_cells()
+
+    def _create_formats(self) -> dict:
+        """Create cell formats for heatmap."""
         base_format = {
             "align": "center",
             "valign": "vcenter",
+            "border": 1,
+            "border_color": "#D3D3D3",
+            "num_format": "0.0",
         }
 
-        # Agregar bordes si está configurado
-        if config.include_borders:
-            base_format.update(
-                {
-                    "border": 1,
-                    "border_color": "#D3D3D3",
-                }
-            )
-
-        # Definir formatos usando los colores de la configuración
-        formats = {
-            "high": workbook.add_format(
+        return {
+            "high": self.workbook.add_format(
                 {
                     **base_format,
-                    "bg_color": config.min_color,  # Verde para valores altos (buenos)
-                    "num_format": "0.0",
+                    "bg_color": "#63BE7B",  # Green
                 }
             ),
-            "medium": workbook.add_format(
+            "medium": self.workbook.add_format(
                 {
                     **base_format,
-                    "bg_color": config.mid_color,  # Amarillo para valores medios
-                    "num_format": "0.0",
+                    "bg_color": "#FFEB84",  # Yellow
                 }
             ),
-            "low": workbook.add_format(
+            "low": self.workbook.add_format(
                 {
                     **base_format,
-                    "bg_color": config.max_color,  # Rojo para valores bajos
-                    "num_format": "0.0",
+                    "bg_color": "#F8696B",  # Red
                 }
             ),
-            "null": workbook.add_format(
+            "text": self.workbook.add_format(
                 {
                     **base_format,
-                    "bg_color": config.null_color,  # Blanco para vacíos
+                    "bg_color": "#FFFFFF",  # White
                 }
             ),
-            "header": workbook.add_format(
+            "header": self.workbook.add_format(
                 {
                     **base_format,
-                    "bg_color": config.header_color,
+                    "bg_color": "#366092",
                     "font_color": "#FFFFFF",
                     "bold": True,
                 }
             ),
         }
 
-        # Aplicar formato a headers
-        for col_idx, col_name in enumerate(df.columns):
-            worksheet.write(0, col_idx, col_name, formats["header"])
+    def _format_headers(self) -> None:
+        """Format header row."""
+        for col_idx, col_name in enumerate(self.df.columns):
+            self.worksheet.write(0, col_idx, col_name, self.formats["header"])
 
-        # Identificar columnas de días
-        day_columns = [
-            col for col in df.columns if col.isdigit() and 1 <= int(col) <= 31
-        ]
+    def _format_data_cells(self) -> None:
+        """Format data cells based on content type and value."""
+        numeric_columns = self._identify_numeric_columns()
 
-        # Identificar columnas a formatear con heatmap
-        heatmap_columns = set(day_columns)
-        if "Promedio" in df.columns:
-            heatmap_columns.add("Promedio")
-
-        # Aplicar formato a celdas
-        for row_idx in range(len(df)):
-            for col_idx, col in enumerate(df.columns):
-                cell_value = df.iloc[row_idx, col_idx]
+        for row_idx in range(len(self.df)):
+            for col_idx, col_name in enumerate(self.df.columns):
+                cell_value = self.df.iloc[row_idx, col_idx]
                 excel_row = row_idx + 1
 
-                # Columnas de texto (DNI, EJECUTIVO)
-                if col in ["DNI", "EJECUTIVO"]:
-                    worksheet.write(excel_row, col_idx, cell_value, formats["null"])
+                if col_name in numeric_columns:
+                    self._format_numeric_cell(excel_row, col_idx, cell_value)
+                else:
+                    self._format_text_cell(excel_row, col_idx, cell_value)
 
-                # Columnas numéricas con heatmap
-                elif col in heatmap_columns:
-                    # Determinar formato basado en valor
-                    if cell_value == "" or cell_value is None or pd.isna(cell_value):
-                        worksheet.write(excel_row, col_idx, "", formats["null"])
-                    else:
-                        try:
-                            value = float(cell_value)
-                            if value >= 3:
-                                cell_format = formats["high"]
-                            elif value >= 2:
-                                cell_format = formats["medium"]
-                            else:
-                                cell_format = formats["low"]
-                            worksheet.write(excel_row, col_idx, value, cell_format)
-                        except (ValueError, TypeError):
-                            worksheet.write(excel_row, col_idx, "", formats["null"])
+    def _identify_numeric_columns(self) -> set[str]:
+        """Identify columns that should have numeric formatting."""
+        numeric_cols = set()
 
-        # Configurar anchos de columna
-        worksheet.set_column(0, 0, 12)  # DNI
-        worksheet.set_column(1, 1, 40)  # EJECUTIVO
+        # Day columns (1-31)
+        for col in self.df.columns:
+            if col.isdigit() and 1 <= int(col) <= 31:
+                numeric_cols.add(col)
 
-        # Días - ancho uniforme
-        for col in day_columns:
-            col_idx = df.columns.get_loc(col)
-            worksheet.set_column(col_idx, col_idx, 6)
+        # Average column
+        if "Promedio" in self.df.columns:
+            numeric_cols.add("Promedio")
 
-        # Promedio
-        if "Promedio" in df.columns:
-            avg_idx = df.columns.get_loc("Promedio")
-            worksheet.set_column(avg_idx, avg_idx, 12)
+        return numeric_cols
 
-        # Congelar paneles
-        worksheet.freeze_panes(1, 2)
+    def _format_numeric_cell(self, row: int, col: int, value) -> None:
+        """Format numeric cell with heatmap colors."""
+        if pd.isna(value) or value == "":
+            self.worksheet.write(row, col, "", self.formats["text"])
+        else:
+            try:
+                numeric_value = float(value)
+                cell_format = self._get_format_for_value(numeric_value)
+                self.worksheet.write(row, col, numeric_value, cell_format)
+            except (ValueError, TypeError):
+                self.worksheet.write(row, col, "", self.formats["text"])
+
+    def _get_format_for_value(self, value: float) -> object:
+        """Determine format based on value and configured ranges."""
+        ranges = self.config.heatmap_ranges
+
+        if value >= ranges["high"]:
+            return self.formats["high"]
+        elif value >= ranges["medium"]:
+            return self.formats["medium"]
+        else:
+            return self.formats["low"]
+
+    def _format_text_cell(self, row: int, col: int, value) -> None:
+        """Format text cell."""
+        self.worksheet.write(row, col, value, self.formats["text"])

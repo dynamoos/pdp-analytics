@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
     )
 
     # Add custom middleware
-    # app.middleware("http")(error_handler_middleware)
+    # app.middleware("http")(error_handler_midcledleware)
 
     # Setup exception handlers
     setup_exception_handlers(app)
